@@ -1,1 +1,2 @@
-# GraphBetaDiffusion
+# GBD
+ 

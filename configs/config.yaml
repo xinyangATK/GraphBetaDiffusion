@@ -1,0 +1,17 @@
+defaults:
+    - _self_
+#    - experiment : gdss_comm20
+#    - general : general_default
+    - model : discrete
+    - train : train_default
+    - dataset : gdss_comm20
+
+hydra:
+  job:
+    chdir: True
+  run:
+    dir: ../outputs/${dataset.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}-${general.name}
+
+
+
+
