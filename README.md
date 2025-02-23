@@ -43,16 +43,20 @@ For `Planar`, `SBM`, `QM9` and `ZINC250k` datasets, please refer to [GruM](https
 ### 2. Configurations
 The configurations are provided in the ```config/``` directory in YAML format. Hyperparameters used in the experiments are specified in the Appendix C of our paper.
 
-### 3. Training
+### 3. Training 
 ```
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset> --seed 0
 ```
 where ```<dataset>``` is one of the experiment configs in ```config/*.yaml```.
 
-We provide specialized concentration modulation strategies for different datasets in ```modulation.py```. 
+### 4. Training with concentration modulation technique
+```
+CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset> --seed 0
+```
 Set ```concentration_m = True``` in experiment configs for traing GBD with concentration modulation technique!
 
-For the new dataset, custom concentration modulation strategy can be defined in a similar way with ```CustomConcentrationM``` module.
+We provide specialized concentration modulation strategies for different datasets in ```modulation.py```. 
+For the **new** dataset, custom concentration modulation strategy can be defined in a similar way with ```CustomConcentrationM``` module.
 
 
 
