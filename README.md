@@ -49,7 +49,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset> --se
 ```
 where ```<dataset>``` is one of the experiment configs in ```config/*.yaml```.
 
-### 4. Training with <span style="color:rgb(196, 136, 236);">Concentration Modulation </span>technique
+### 4. Training with <span style="color:#c488ec;">Concentration Modulation </span>technique
 ```
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset> --seed 0
 ```
