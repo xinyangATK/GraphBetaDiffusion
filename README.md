@@ -47,7 +47,6 @@ The configurations are provided in the ```config/``` directory in YAML format. H
 ```
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset> --seed 0
 ```
-where ```<dataset>``` is one of the experiment configs in ```config/*.yaml```.
 
 Training with **Concentration Modulation** technique
 ```
@@ -64,7 +63,6 @@ For the **new** dataset, custom concentration modulation strategy can be defined
 ```
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type sample --config <dataset>
 ```
-where ```<dataset>``` is one of the experiment configs in ```config/*.yaml```
 
 <a name="visualization"></a>
 ## Visualization
