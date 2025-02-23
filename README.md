@@ -1,9 +1,11 @@
 # [Advancing Graph Generation through Beta Diffusion](https://arxiv.org/abs/2406.09357) (ICLR 2025)
-By [Xinyang Liu](https://xinyangatk.github.io)$^{*1}$, [Yilin He](https://scholar.google.com/citations?user=oJu3WzsAAAAJ&hl=en)$^{*1}$, [Bo Chen](https://web.xidian.edu.cn/bchen/)$^{2}$, [Mingyuan Zhou](https://mingyuanzhou.github.io)$^{1}$
+
+By [Xinyang Liu](https://xinyangatk.github.io)\*<sup>1</sup>, [Yilin He](https://scholar.google.com/citations?user=oJu3WzsAAAAJ&hl=en)\*<sup>1</sup>, [Bo Chen](https://web.xidian.edu.cn/bchen/)<sup>2</sup>, [Mingyuan Zhou](https://mingyuanzhou.github.io)<sup>1</sup>
 \
-$^1$The University of Texas at Austin, $^2$Xidian University
+<sup>1</sup>The University of Texas at Austin, <sup>2</sup>Xidian University
 \
-$^*$Equal contribution
+\*Equal contribution
+
 
 ![Overview of GBD](assets/model.png)
 
