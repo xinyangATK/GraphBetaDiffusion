@@ -6,6 +6,8 @@ By [Xinyang Liu](https://xinyangatk.github.io)\*<sup>1</sup>, [Yilin He](https:/
 \
 \*Equal contribution
 
+<a href='https://arxiv.org/pdf/2406.09357'><img alt="Static Badge" src="https://img.shields.io/badge/Paper-arXiv-red"></a>
+
 
 ![Overview of GBD](assets/model.png)
 
@@ -17,11 +19,11 @@ In this repo, we will release (**updating**):
 
 - Environment Dependencies &#x2705;
 - Checkpoints &#x1F4CC;
-- Reproducing Experiments &#x1F4CC;
-  - Dataset preparations &#x2705;
-  - Configurations &#x2705;
-  - Training &#x2705;
-  - Generation and Evaluation &#x1F4CC;
+- Reproducing Experiments &#x2705;
+  - Dataset preparations 
+  - Configurations 
+  - Training 
+  - Generation and Evaluation
 - Visualization &#x1F4CC;
 
 
@@ -35,8 +37,8 @@ Our code was built on [DiGress](https://arxiv.org/abs/2209.14734), please refer 
 
 ### 1. Dataset preparations
 
-For `Community-small`, `Ego-small` and `Grid` datasets, please refer to [GDSS](https://github.com/harryjo97/GDSS)\
-For `Planar`, `SBM`, `QM9` and `ZINC250k` datasets, please refer to [GruM](https://github.com/harryjo97/GruM/tree/master/GruM_2D#1-dataset-preparations)
+For `Community-small`, `Ego-small` and `Grid` datasets, please refer to [GDSS](https://github.com/harryjo97/GDSS).\
+For `Planar`, `SBM`, `QM9` and `ZINC250k` datasets, please refer to [GruM](https://github.com/harryjo97/GruM/tree/master/GruM_2D#1-dataset-preparations).
 
 ### 2. Configurations
 The configurations are provided in the ```config/``` directory in YAML format. Hyperparameters used in the experiments are specified in the Appendix C of our paper.
@@ -46,7 +48,11 @@ The configurations are provided in the ```config/``` directory in YAML format. H
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset> --seed 0
 ```
 where ```<dataset>``` is one of the experiment configs in ```config/*.yaml```.
-Set ```concentration_m = True``` in experiment configs for traing GBD with concentration modulation technique.
+
+We provide specialized concentration modulation strategies for different datasets in ```modulation.py```. 
+Set ```concentration_m = True``` in experiment configs for traing GBD with concentration modulation technique!
+
+For the new dataset, custom concentration modulation strategy can be defined in a similar way with ```CustomConcentrationM``` module.
 
 
 
@@ -56,7 +62,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type sample --config <dataset>
 ```
 where ```<dataset>``` is one of the experiment configs in ```config/*.yaml```
 
-
+<a name="visualization"></a>
 ## Visualization
 ![Overview of GBD](assets/eta.png)
 
@@ -64,10 +70,11 @@ Edge generation process of with **concentration modulation defined by node degre
 
 
 
-
-### Acknowledgements
+<a name="acknowledgements"></a>
+## Acknowledgements
 This repository was heavily built off of [DiGress](https://github.com/cvignac/DiGress), [GDSS](https://github.com/harryjo97/GDSS) and [GruM](https://github.com/harryjo97/GruM/tree/master/GruM_2D).
 
+<a name="citation"></a>
 ## Citation
 ```
 @article{liu2024advancing,
