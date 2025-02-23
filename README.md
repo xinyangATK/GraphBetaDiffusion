@@ -44,21 +44,22 @@ For `Planar`, `SBM`, `QM9` and `ZINC250k` datasets, please refer to [GruM](https
 The configurations are provided in the ```config/``` directory in YAML format. Hyperparameters used in the experiments are specified in the Appendix E of our paper.
 
 ### 3. Training 
+Training GBD on general and biochemical graph benchmark:
 ```
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset> --seed 0
 ```
 
-Training with **Concentration Modulation** technique:
+Training GBD with **Concentration Modulation** technique:
 
-Set ```concentration_m = True``` in experiment configs for traing GBD with concentration modulation technique!
-
-We provide specialized concentration modulation strategies for different datasets in ```modulation.py```. 
+- Set ```concentration_m = True``` in experiment configs for traing GBD with concentration modulation technique!
+- We provide specialized concentration modulation strategies for different datasets in ```modulation.py```. 
 
 For the **new** dataset, custom concentration modulation strategy can be defined in a similar way with ```CustomConcentrationM``` module.
 
 
 
 ### 4. Generation and Evaluation
+![Overview of GBD](assets/sample.png)
 ```
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type sample --config <dataset>
 ```
