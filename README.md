@@ -41,20 +41,19 @@ For `Community-small`, `Ego-small` and `Grid` datasets, please refer to [GDSS](h
 For `Planar`, `SBM`, `QM9` and `ZINC250k` datasets, please refer to [GruM](https://github.com/harryjo97/GruM/tree/master/GruM_2D#1-dataset-preparations).
 
 ### 2. Configurations
-The configurations are provided in the ```config/``` directory in YAML format. Hyperparameters used in the experiments are specified in the Appendix C of our paper.
+The configurations are provided in the ```config/``` directory in YAML format. Hyperparameters used in the experiments are specified in the Appendix E of our paper.
 
 ### 3. Training 
 ```
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset> --seed 0
 ```
 
-Training with **Concentration Modulation** technique
-```
-CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset> --seed 0
-```
+Training with **Concentration Modulation** technique:
+
 Set ```concentration_m = True``` in experiment configs for traing GBD with concentration modulation technique!
 
 We provide specialized concentration modulation strategies for different datasets in ```modulation.py```. 
+
 For the **new** dataset, custom concentration modulation strategy can be defined in a similar way with ```CustomConcentrationM``` module.
 
 
