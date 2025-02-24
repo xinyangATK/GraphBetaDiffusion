@@ -52,9 +52,9 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset> --se
 Training GBD with **Concentration Modulation** technique:
 
 - Set ```concentration_m = True``` in experiment configs for traing GBD with concentration modulation technique!
-- We provide specialized concentration modulation strategies for different datasets in ```modulation.py```. 
+- We provide specialized concentration modulation strategies for different datasets in ```concentration.py```. 
 
-For the **new** dataset, custom concentration modulation strategy can be defined in a similar way with ```CustomConcentrationM``` module.
+For the **new** dataset, custom concentration modulation strategy can be defined in a similar way with ```CustomConcentrationModule``` module.
 
 
 
