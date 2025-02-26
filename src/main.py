@@ -18,7 +18,7 @@ from pytorch_lightning.utilities.warnings import PossibleUserWarning
 from src import utils
 
 from diffusion.extra_features import DummyExtraFeatures
-from model_init import load_model, load_model_from_ckpt
+from src.gbd_utils.loader import load_model, load_model_from_ckpt
 from eval import EVAL_METRICS
 # #
 # os.environ["RANK"] = "0"
