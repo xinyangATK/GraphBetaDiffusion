@@ -22,7 +22,7 @@ from diffusion.extra_features import DummyExtraFeatures, ExtraFeatures
 from beta_diffusion_model_comm20_eta import BetaDiffusion
 # from beta_diffusion_model_ego_eta import BetaDiffusion
 import torch.distributed as dist
-from src.evaluate import EVAL_METRICS
+from src.evaluation.evaluate import EVAL_METRICS
 #
 # os.environ["RANK"] = "0"
 # os.environ["WORLD_SIZE"] = "1"
