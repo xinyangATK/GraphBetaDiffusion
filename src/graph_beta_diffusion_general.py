@@ -27,6 +27,7 @@ from GDSS_utils.evaluation.stats import *
 import logging
 from src.gbd_utils.loader import build_ema, save_ema, load_ema, load_general_graph_list
 from gbd_utils.precondition import PreConditionMoudle
+from gbd_utils.concentration import GeneralGraphConcentrationModule
 
 
 
@@ -129,6 +130,8 @@ class GraphBetaDiffusion(pl.LightningModule):
         self.prob_E = torch.tensor([0.2914])  
 
         self.pre_cond = PreConditionMoudle(self.Scale, self.Shift, (self.prob_X, self.prob_E))
+        self.con_module = GeneralGraphConcentrationModule(self.eta, concentration_modulation=None)
+        self.threshold_list = self.con_module.get_threshold_list(self.cfg.dataset.name)
 
         self.log2file = myloggger(os.path.join(os.getcwd(), f'res.txt'))
 
@@ -251,16 +254,11 @@ class GraphBetaDiffusion(pl.LightningModule):
         #     node_idx = torch.argsort(E.sum((-1, -2)), dim=1, descending=True)
         #     X, E, node_mask = self.order_graph(X, E, node_mask, node_idx)
 
-        # TODO chech this function
         # allpy different eta on edge depends on ordered nodes
-        eta_x = self.get_eta4x(E, self.eta['node'])
-        eta_x = eta_x.unsqueeze(-1)
-        eta_e = self.get_eta4e(E, X, eta=self.eta['edge'], eta_x=eta_x)
-        eta_e = eta_e.unsqueeze(-1)
+        concentration_value = self.con_module.get_value(self.cfg.dataset.name, node_feat=X, adj=E)
+        eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
+        eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
         eta_pair = (eta_x, eta_e)
-
-        if self.cfg.dataset.rand_perm:
-            X, E, node_mask, eta_pair = rand_perm_mol(X, E, node_mask, eta_pair)
 
         X = self.scale_shift(X, type='node')
         E = self.scale_shift(E, type='edge')
@@ -368,8 +366,11 @@ class GraphBetaDiffusion(pl.LightningModule):
                     sample_deg, nodes_num = self.sample_from_train(to_generate, re_deg=True, re_feat=False)
 
                 with self.ema_scope('Validation Sampling'):
-                    graph = self.sample_batch(batch_id=ident, batch_size=to_generate, num_nodes=nodes_num,
-                                              save_final=to_save, extra_feat=sample_extra_feat, eta_from=sample_deg,
+                    graph = self.sample_batch(batch_id=ident, 
+                                              batch_size=to_generate, 
+                                              num_nodes=nodes_num,
+                                              save_final=to_save, 
+                                              concentration_value=sample_deg,
                                               return_E=True)
                 E, n_nodes = graph
                 for (e, n_node) in zip(E, n_nodes):
@@ -454,8 +455,11 @@ class GraphBetaDiffusion(pl.LightningModule):
                 sample_deg, nodes_num = self.sample_from_train(to_generate, re_deg=True, re_feat=False)
 
             with self.ema_scope('Test Sampling'):
-                graph = self.sample_batch(batch_id=ident, batch_size=to_generate, num_nodes=nodes_num,
-                                        save_final=to_save, extra_feat=sample_extra_feat, eta_from=sample_deg,
+                graph = self.sample_batch(batch_id=ident,
+                                        batch_size=to_generate, 
+                                        num_nodes=nodes_num,
+                                        save_final=to_save, 
+                                        compute_extra_data=sample_deg,
                                         return_E=True)
             E, n_nodes = graph
             for (e, n_node) in zip(E, n_nodes):
@@ -602,7 +606,7 @@ class GraphBetaDiffusion(pl.LightningModule):
     @torch.no_grad()
     def sample_batch(self, batch_id: int = 0, batch_size: int = 32,
                      save_final: int = 10, alpha_T=None,
-                     num_nodes=None, extra_feat=None, eta_from=None, return_E=False, num_chain_step=None,
+                     num_nodes=None, concentration_value=None, return_E=False, num_chain_step=None,
                      keep_chain=None):
         """
         :param batch_id: int
@@ -647,8 +651,8 @@ class GraphBetaDiffusion(pl.LightningModule):
         X_s = 0.01 * torch.ones(batch_size, N, max_feat_num, device=self.device)
         E_s = 0.01 * torch.ones(batch_size, N, N, 1, device=self.device)
 
-        eta_x = self.get_eta4x(E_s, eta=self.eta['node'], deg=eta_from).unsqueeze(-1)
-        eta_e = self.get_eta4e(E_s, X_s, eta=self.eta['edge'], eta_x=eta_x).unsqueeze(-1)
+        eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
+        eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
         eta_pair = (eta_x, eta_e)
 
         X_s = self.scale_shift(X_s, type='node')

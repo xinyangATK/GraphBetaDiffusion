@@ -25,7 +25,7 @@ from GDSS_utils.utils.graph_utils import *
 from GDSS_utils.utils.loader import *
 from GDSS_utils.evaluation.stats import *
 import logging
-from model_init import load_ema, load_ema_from_ckpt
+from src.gbd_utils.loader import load_ema, load_ema_from_ckpt
 
 EPS = torch.finfo(torch.float32).eps
 MIN = torch.finfo(torch.float32).tiny

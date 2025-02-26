@@ -19,7 +19,7 @@ from src import utils
 
 from diffusion.extra_features import DummyExtraFeatures
 from src.gbd_utils.loader import load_model, load_model_from_ckpt
-from eval import EVAL_METRICS
+from src.evaluate import EVAL_METRICS
 # #
 # os.environ["RANK"] = "0"
 # os.environ["WORLD_SIZE"] = "1"
@@ -59,7 +59,7 @@ def get_resume(cfg, model_kwargs):
 @hydra.main(version_base='1.3', config_path='../configs/experiment/', config_name='gdss_ego.yaml')
 def main(cfg: DictConfig):
     dataset_config = cfg["dataset"]
-    if dataset_config["name"] in ['sbm', 'comm20', 'planar', 'gdss-comm20', 'gdss-ego']:
+    if dataset_config["name"] in ['sbm', 'planar', 'gdss-comm20', 'gdss-ego']:
         from analysis.visualization import NonMolecularVisualization
         from src.datasets.generic_dataset import GenericGraphDataModule, GenericDatasetInfos
 

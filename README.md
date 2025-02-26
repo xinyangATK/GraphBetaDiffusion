@@ -68,7 +68,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type sample --config <dataset>
 ## Visualization
 ![Overview of GBD](assets/eta.png)
 
-Edge generation process of with **concentration modulation defined by node degree** on  `Community-small` dataset.
+Edge generation process of GBD with **concentration modulation defined by node degree** on  `Community-small` dataset.
 
 
 
