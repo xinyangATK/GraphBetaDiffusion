@@ -41,7 +41,7 @@ For `Community-small`, `Ego-small` and `Grid` datasets, please refer to [GDSS](h
 For `Planar`, `SBM`, `QM9` and `ZINC250k` datasets, please refer to [GruM](https://github.com/harryjo97/GruM/tree/master/GruM_2D#1-dataset-preparations).
 
 ### 2. Configurations
-The configurations are provided in the ```config/``` directory in YAML format. Hyperparameters used in the experiments are specified in the Appendix E of our paper.
+The configurations are provided in the ```config/``` directory in ```YAML``` format. Hyperparameters used in the experiments are specified in the Appendix E of our paper.
 
 ### 3. Training 
 Training GBD on general and biochemical graph benchmark:

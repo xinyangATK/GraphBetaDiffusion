@@ -4,6 +4,9 @@ import logging
 import os, sys
 import pathlib
 import warnings
+dir_path = os.path.dirname(os.path.realpath(__file__))
+parent_dir_path = os.path.abspath(os.path.join(dir_path, os.pardir))
+sys.path.insert(0, parent_dir_path)
 import pytorch_lightning.loggers
 import torch
 torch.cuda.empty_cache()
@@ -17,7 +20,12 @@ from src import utils
 from diffusion.extra_features import DummyExtraFeatures
 from src.gbd_utils.loader import load_model, load_model_from_ckpt
 from src.evaluate import EVAL_METRICS
-
+# #
+# os.environ["RANK"] = "0"
+# os.environ["WORLD_SIZE"] = "1"
+# os.environ["MASTER_ADDR"] = "localhost"
+# os.environ["MASTER_PORT"] = "5678"
+# torch.distributed.init_process_group("nccl")
 
 warnings.filterwarnings("ignore", category=PossibleUserWarning)
 
