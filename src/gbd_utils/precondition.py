@@ -5,13 +5,38 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class PreConditionMoudle(object):
-    def __init__(self, Shift, Scale, prob=None):
+    def __init__(self, dataset_name, Shift, Scale):
+        self.dataset_name = dataset_name
         self.Shift = Shift
         self.Scale = Scale
+
+        prob = self.get_discrete_prob(self.dataset_name, prob, num_classes=2)
         if isinstance(prob, tuple):
             self.prob_X, self.prob_E = prob
         else:
             self.prob_X = self.prob_E = prob
+
+    def get_discrete_prob(self, dataset_name, prob, num_classes=None):
+        if prob is None:
+            return None
+        if dataset_name == 'comm20':
+            prob_X = torch.tensor([0.0000, 0.0393, 0.2376, 0.2376, 0.2192, 0.1394, 0.0910, 0.0340, 0.0020])
+            prob_E = torch.tensor([0.2914]) 
+        elif dataset_name == 'ego':
+            ValueError('Not implenmted. The code will Coming soon.')
+        elif dataset_name == 'planar':
+            ValueError('Not implenmted. The code will Coming soon.')
+        elif dataset_name == 'sbm':
+            ValueError('Not implenmted. The code will Coming soon.')
+        elif dataset_name == 'qm9':
+            ValueError('Not implenmted. The code will Coming soon.')
+        elif dataset_name == 'zinc250k':
+            ValueError('Not implenmted. The code will Coming soon.')
+        else:
+            raise ValueError('Invalid dataset')
+        
+        return (prob_X, prob_E)
+        
 
     def scale_shift(self, input, type='node'):
         new_input = self.Scale[type] * input + self.Shift[type]

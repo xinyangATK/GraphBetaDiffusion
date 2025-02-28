@@ -12,29 +12,31 @@ import os
 from contextlib import contextmanager
 from tqdm import tqdm
 from models.transformer_model import GraphTransformer
-from matplotlib.colors import ListedColormap
 from matplotlib.colors import LinearSegmentedColormap
 from src.diffusion import diffusion_utils
-from metrics.train_metrics import TrainLossBeta, TrainLoss, TrainLossDiscrete
-from metrics.abstract_metrics import SumExceptBatchMetric, SumExceptBatchKL, NLL
+from metrics.train_metrics import TrainLossBeta
 from src import utils
 import pickle
 from random import sample
-from GDSS_utils.utils.mol_utils import *
-from GDSS_utils.utils.graph_utils import *
-from GDSS_utils.utils.loader import *
-from GDSS_utils.evaluation.stats import *
-import logging
+
 from src.gbd_utils.loader import build_ema, save_ema, load_ema, load_general_graph_list
+
+# Import GDSS utils
+from gdss_utils.utils.mol_utils import *
+from gdss_utils.utils.graph_utils import *
+from gdss_utils.utils.loader import *
+from gdss_utils.evaluation.stats import *
+import logging
+
+# Import Beta utils
 from gbd_utils.precondition import PreConditionMoudle
+from gbd_utils.concentration import GeneralGraphConcentrationModule
+from gbd_utils.graph_utils import *
 
 
 
 EPS = torch.finfo(torch.float32).eps
 MIN = torch.finfo(torch.float32).tiny
-clamp_min = 0.405465
-clamp_max = 4.595119
-
 
 class myloggger(object):
     def __init__(self, file_path):
@@ -125,10 +127,9 @@ class GraphBetaDiffusion(pl.LightningModule):
 
         self.noise_feat_type = self.cfg.model.noise_feat_type
 
-        self.prob_X = torch.tensor([0.0000, 0.0393, 0.2376, 0.2376, 0.2192, 0.1394, 0.0910, 0.0340, 0.0020])
-        self.prob_E = torch.tensor([0.2914])  
-
         self.pre_cond = PreConditionMoudle(self.Scale, self.Shift, (self.prob_X, self.prob_E))
+        self.con_module = GeneralGraphConcentrationModule(self.eta, concentration_modulation=None)
+        self.threshold_list = self.con_module.get_threshold_list(self.cfg.dataset.name)
 
         self.log2file = myloggger(os.path.join(os.getcwd(), f'res.txt'))
 
@@ -249,18 +250,13 @@ class GraphBetaDiffusion(pl.LightningModule):
         # Sort nodes by degree, descending
         # if self.cfg.re_order:
         #     node_idx = torch.argsort(E.sum((-1, -2)), dim=1, descending=True)
-        #     X, E, node_mask = self.order_graph(X, E, node_mask, node_idx)
+        #     X, E, node_mask = order_graph(X, E, node_mask, node_idx)
 
-        # TODO chech this function
         # allpy different eta on edge depends on ordered nodes
-        eta_x = self.get_eta4x(E, self.eta['node'])
-        eta_x = eta_x.unsqueeze(-1)
-        eta_e = self.get_eta4e(E, X, eta=self.eta['edge'], eta_x=eta_x)
-        eta_e = eta_e.unsqueeze(-1)
+        concentration_value = self.con_module.get_value(self.cfg.dataset.name, node_feat=X, adj=E)
+        eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
+        eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
         eta_pair = (eta_x, eta_e)
-
-        if self.cfg.dataset.rand_perm:
-            X, E, node_mask, eta_pair = rand_perm_mol(X, E, node_mask, eta_pair)
 
         X = self.scale_shift(X, type='node')
         E = self.scale_shift(E, type='edge')
@@ -368,8 +364,11 @@ class GraphBetaDiffusion(pl.LightningModule):
                     sample_deg, nodes_num = self.sample_from_train(to_generate, re_deg=True, re_feat=False)
 
                 with self.ema_scope('Validation Sampling'):
-                    graph = self.sample_batch(batch_id=ident, batch_size=to_generate, num_nodes=nodes_num,
-                                              save_final=to_save, extra_feat=sample_extra_feat, eta_from=sample_deg,
+                    graph = self.sample_batch(batch_id=ident, 
+                                              batch_size=to_generate, 
+                                              num_nodes=nodes_num,
+                                              save_final=to_save, 
+                                              concentration_value=sample_deg,
                                               return_E=True)
                 E, n_nodes = graph
                 for (e, n_node) in zip(E, n_nodes):
@@ -454,8 +453,11 @@ class GraphBetaDiffusion(pl.LightningModule):
                 sample_deg, nodes_num = self.sample_from_train(to_generate, re_deg=True, re_feat=False)
 
             with self.ema_scope('Test Sampling'):
-                graph = self.sample_batch(batch_id=ident, batch_size=to_generate, num_nodes=nodes_num,
-                                        save_final=to_save, extra_feat=sample_extra_feat, eta_from=sample_deg,
+                graph = self.sample_batch(batch_id=ident,
+                                        batch_size=to_generate, 
+                                        num_nodes=nodes_num,
+                                        save_final=to_save, 
+                                        compute_extra_data=sample_deg,
                                         return_E=True)
             E, n_nodes = graph
             for (e, n_node) in zip(E, n_nodes):
@@ -602,7 +604,7 @@ class GraphBetaDiffusion(pl.LightningModule):
     @torch.no_grad()
     def sample_batch(self, batch_id: int = 0, batch_size: int = 32,
                      save_final: int = 10, alpha_T=None,
-                     num_nodes=None, extra_feat=None, eta_from=None, return_E=False, num_chain_step=None,
+                     num_nodes=None, concentration_value=None, return_E=False, num_chain_step=None,
                      keep_chain=None):
         """
         :param batch_id: int
@@ -647,8 +649,8 @@ class GraphBetaDiffusion(pl.LightningModule):
         X_s = 0.01 * torch.ones(batch_size, N, max_feat_num, device=self.device)
         E_s = 0.01 * torch.ones(batch_size, N, N, 1, device=self.device)
 
-        eta_x = self.get_eta4x(E_s, eta=self.eta['node'], deg=eta_from).unsqueeze(-1)
-        eta_e = self.get_eta4e(E_s, X_s, eta=self.eta['edge'], eta_x=eta_x).unsqueeze(-1)
+        eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
+        eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
         eta_pair = (eta_x, eta_e)
 
         X_s = self.scale_shift(X_s, type='node')
@@ -739,7 +741,7 @@ class GraphBetaDiffusion(pl.LightningModule):
         # Sample
         X = self.shift_scale(X, type='node')
         E = self.shift_scale(E, type='edge')
-        # Alternate choice
+        # Alternate choice TODO
         # X = X * 2 - 0
         # X = self.shift_scale(torch.sigmoid(logit_X_s)/alpha_s)
         # E = self.shift_scale(torch.sigmoid(logit_E_s)/alpha_s)
@@ -856,35 +858,34 @@ class GraphBetaDiffusion(pl.LightningModule):
         else:
             return feat, num_nodes
 
-    def order_graph(self, X, E, node_mask, node_idx):
-        reordered_X, reordered_E, reordered_node_mask = [], [], []
-        for g_id in range(node_idx.size(0)):
-            node_order = node_idx[g_id]
-            reordered_X.append(X[g_id][node_order])
-            reordered_E.append(E[g_id][node_order, :][:, node_order])
-            reordered_node_mask.append(node_mask[g_id][node_order])
-        X = torch.stack(reordered_X, dim=0)
-        E = torch.stack(reordered_E, dim=0)
-        node_mask = torch.stack(reordered_node_mask, dim=0)
+    def visualization_graph_matrix(self, 
+                                X, 
+                                E, 
+                                node_mask, 
+                                given_t_split=50, 
+                                vis_graph=True, 
+                                vis_matrix=True, 
+                                vis_forward=True,
+                                order=False):
 
-        return X, E, node_mask
-
-    def visualization_graph_matrix(self, X, E, node_mask, given_t_split=50, graph=True, matrix=True, sample_vis=False,
-                                   order=False):
-
-        if not sample_vis:
+        diffusion_process = 'Forward' if vis_forward else 'Reverse'
+        if vis_forward:
             file_name = 'forward_process'
             node_idx = torch.argsort(E.sum((-1, -2)), dim=1, descending=True)
-            X, E, node_mask = self.order_graph(X, E, node_mask, node_idx)
-            x_eta = self.get_eta4x(E, self.eta)
+            X, E, node_mask = order_graph(X, E, node_mask, node_idx)
+
+            concentration_value = self.con_module.get_value(self.cfg.dataset.name, node_feat=X, adj=E)
+            eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
+            eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
+            eta_pair = (eta_x, eta_e)
 
             # Follow the steps in Beta Diffusion.
             # noisy_data in original/logit input_space
-
             y = torch.zeros((X.size(0), 0)).to(self.device)
             X = self.scale_shift(X)
             E = self.scale_shift(E)
-            noisy_data = self.apply_noise(X, E, y, node_mask, given_t_split=given_t_split, etas=x_eta)
+
+            noisy_data = self.apply_noise(X, E, y, node_mask, given_t_split=given_t_split, etas=eta_x)
             if self.input_space == 'logit':
                 noisy_data['X_t'] = noisy_data['X_t'].sigmoid()
                 noisy_data['E_t'] = noisy_data['E_t'].sigmoid()
@@ -892,12 +893,11 @@ class GraphBetaDiffusion(pl.LightningModule):
             noisy_data['X_t'] = self.shift_scale(noisy_data['X_t'])
             noisy_data['E_t'] = self.shift_scale(noisy_data['E_t'])
 
-            con_X, con_E = self.mask_and_sym(noisy_data['X_t'], noisy_data['E_t'],
-                                             noisy_data['node_mask'])
+            con_X, con_E = self.mask_and_sym(noisy_data['X_t'], noisy_data['E_t'], noisy_data['node_mask'])
             X, E = con_X.clone(), con_E.clone()
             node_mask = noisy_data['node_mask']
         else:
-            file_name = 'sample_process'
+            file_name = 'reverse_process'
             if order:
                 tmp_beta_sample_s = diffusion_utils.sample_beta_features(X.clone(), E.clone(), node_mask, threshold=0.5,
                                                                          is_node_feat=True)
@@ -916,10 +916,10 @@ class GraphBetaDiffusion(pl.LightningModule):
         n_nodes = node_mask.sum(-1)
 
         # Visualization
-        print('Visualization process with {} graphs for {} time steps...'.format(X.size(0), given_t_split))
+        self.print('Visualization process with {} graphs for {} time steps...'.format(X.size(0), given_t_split))
 
         # Graph Visualization
-        if graph:
+        if vis_graph:
             beta_sample_s = diffusion_utils.sample_beta_features(X, E, node_mask, threshold=0.5, is_node_feat=True)
             out_one_hot = beta_sample_s.mask(node_mask, argmax=True, collapse=True)
             X, E, y = out_one_hot.X, out_one_hot.E, out_one_hot.y
@@ -927,41 +927,19 @@ class GraphBetaDiffusion(pl.LightningModule):
             Es = []
             for i in range(X.size(0)):
                 n = n_nodes[i]
-                # atom_types = X[i, :n].cpu()
                 Es.append(E[i, :n, :n].cpu())
             gen_graph_list = adjs_to_graphs(Es, True)
 
+            # save graph pkl
             ckpt_dir = self.cfg.general.test_only.split('checkpoints')[0]
             ckpt_name = self.cfg.general.test_only.split('/')[-1].split('=')[1].split('-')[0]
-            graph_ckpt_path = os.path.join(ckpt_dir, f'{ckpt_name}.pkl')
+            graph_ckpt_path = os.path.join(ckpt_dir, f'{diffusion_process}_Graph_Process_{ckpt_name}.pkl')
             with open(graph_ckpt_path, 'wb') as f:
                 pickle.dump(obj=gen_graph_list, file=f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-
-            # molecule_list = []
-            # for i in range(X.size(0)):
-            #     n = n_nodes[i]
-            #     atom_types = X[i, :n].cpu()
-            #     edge_types = E[i, :n, :n].cpu()
-            #     molecule_list.append([atom_types, edge_types])
-            #
-            # # Visualize chains
-            # if self.visualization_tools is not None:
-            #     for idx in range(X.size(0) // given_t_split):
-            #         print(f'\nVisualizing Graphs {idx}...')
-            #
-            #         # Visualize the final molecules
-            #         current_path = os.getcwd()
-            #
-            #         result_path = os.path.join(current_path,
-            #                                    f'{file_name}/graph_{idx}/')
-            #         self.visualization_tools.visualize(result_path,
-            #                                            molecule_list[idx * given_t_split: (idx + 1) * given_t_split],
-            #                                            given_t_split)
-            #         print("Done.")
         # Matrix Visualization
-        if matrix:
+        if vis_matrix:
             cmap_colors = [(1, 1, 1), (0, 0, 0)]
             cmap = LinearSegmentedColormap.from_list('CustomCmap', cmap_colors)
             graph_num = con_E.size(0) // given_t_split
@@ -976,7 +954,7 @@ class GraphBetaDiffusion(pl.LightningModule):
                     ax.imshow(adj, cmap=cmap, interpolation='nearest', vmin=0, vmax=1)
                     ax.set_xticks([])
                     ax.set_yticks([])
-                # plt.subplots_adjust(wspace=0, hspace=0)
+
                 current_path = os.getcwd()
 
                 result_path = os.path.join(current_path,
@@ -985,8 +963,8 @@ class GraphBetaDiffusion(pl.LightningModule):
                     os.makedirs(result_path)
 
                 plt.tight_layout()
-                plt.savefig(os.path.join(result_path, 'Matrix_Process.png', ))
-                # plt.show()
+                plt.savefig(os.path.join(result_path, f'{diffusion_process}_Matrix_Process.png', ))
+
 
     def process_visualization(self, datamodule, given_t_split=20):
 
@@ -1012,7 +990,7 @@ class GraphBetaDiffusion(pl.LightningModule):
             sample_deg, nodes_num = self.sample_from_train(to_sample, re_deg=True, re_feat=False)
         # else:
         #     sample_extra_feat, nodes_num = None, None
-        chain_X, chain_E, node_mask = self.sample_batch(batch_size=to_sample, num_nodes=nodes_num, eta_from=sample_deg,
+        chain_X, chain_E, node_mask = self.sample_batch(batch_size=to_sample, num_nodes=nodes_num, concentration_value=sample_deg,
                                                         num_chain_step=given_t_split, keep_chain=to_sample)
 
         # X = torch.stack(chain_X, dim=0)

@@ -19,7 +19,7 @@ from src import utils
 
 from diffusion.extra_features import DummyExtraFeatures
 from src.gbd_utils.loader import load_model, load_model_from_ckpt
-from src.evaluation.evaluate import EVAL_METRICS
+from src.gbd_utils.evaluate import EVAL_METRICS
 # #
 # os.environ["RANK"] = "0"
 # os.environ["WORLD_SIZE"] = "1"
