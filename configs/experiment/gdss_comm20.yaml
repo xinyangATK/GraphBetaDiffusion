@@ -64,7 +64,7 @@ model:
     extra_features:          # 'all', 'cycles', 'eigenvalues' or null
     high_order: False
     # Do not set hidden_mlp_E, dim_ffE too high, computing large tensors on the edges is costly
-    # At the moment (03/08), y contains quite little information
+
     hidden_mlp_dims: {'X': 256, 'E': 128, 'y': 128}
 
     # The dimensions should satisfy dx % n_head == 0

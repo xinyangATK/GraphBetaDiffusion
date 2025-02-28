@@ -108,7 +108,7 @@ class GenericGraphDataset(InMemoryDataset):
         for (x, adj) in zip(raw_x, raw_adj):
             n = x[..., 1:raw_feat_dim[0]].sum().to(torch.long)
 
-            # reorder
+            # GBD change: reorder via node degree
             node_order = torch.arange(self.max_node_num)
             node_order[:n] = torch.argsort(adj[:n, :n].sum(-1), dim=-1, descending=True)
             x = x[node_order]
