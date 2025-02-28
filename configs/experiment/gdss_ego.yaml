@@ -1,7 +1,7 @@
 dataset:
-    name: 'gdss-comm20'
+    name: 'gdss-ego'
     remove_h: null
-    datadir: 'data/gdss-comm20/'
+    datadir: 'data/gdss-ego/'
     rand_perm: False
     feat:
         type:
@@ -15,7 +15,7 @@ general:
     # General settings
     name: 'graph-tf-model'      # Warning: 'debug' and 'test' are reserved name that have a special behavior
 
-    forward_visualization: False
+    process_visualization: False
     sample_visualization: False
     vis_number: 10
 
@@ -28,7 +28,7 @@ general:
     check_val_every_n_epochs: 5000
     sample_every_val: 1
     val_check_interval: null
-    samples_to_generate: 200      # We advise to set it to 2 x batch_size maximum
+    samples_to_generate: 400      # We advise to set it to 2 x batch_size maximum
     samples_to_save: 20
     chains_to_save: 1
     log_every_steps: 50
@@ -64,13 +64,13 @@ model:
     extra_features:          # 'all', 'cycles', 'eigenvalues' or null
     high_order: False
     # Do not set hidden_mlp_E, dim_ffE too high, computing large tensors on the edges is costly
-
+    # At the moment (03/08), y contains quite little information
     hidden_mlp_dims: {'X': 256, 'E': 128, 'y': 128}
 
     # The dimensions should satisfy dx % n_head == 0
     hidden_dims : {'dx': 256, 'de': 64, 'dy': 64, 'n_head': 8, 'dim_ffX': 256, 'dim_ffE': 128, 'dim_ffy': 128}
 
-    lambda_train: [5, 0]
+    lambda_train: [2, 0]
 
     sigmoid_start: 10    # 9
     sigmoid_end: -13     # -9
@@ -80,15 +80,15 @@ model:
         edge: [0.9, 0.09]    # originally 0.6
 
     eta:
-        node: [1000, 30, 10]  # [1000, 10, 1]
-        edge: [1000, 30, 10]
+        node: [100, 30, 30, 10]  # [1000, 10, 1]
+        edge: [100, 30, 30, 10]
 
     input_space: 'logit' # 'logit' or 'original'
     pre_condition: True
 
     noise_feat_type: 'deg' # 'deg', 'eig', 'all', None
     default_min_max: [-1., 1.]  # None
-    max_feat_num: [10, 1, 1]
+    max_feat_num: [17, 1, 1]
 
     cibcentration_m: False
     concentration_strategy: 'deg' # 'deg', 'central', 'betweenness'

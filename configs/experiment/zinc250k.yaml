@@ -1,53 +1,49 @@
+# @package _global_
 dataset:
-    name: 'gdss-comm20'
-    remove_h: null
-    datadir: 'data/gdss-comm20/'
-    rand_perm: False
-    feat:
-        type:
-            - deg
-            - eig1
-            - eig2
-        scale: 10
-        norm: True
+    name: 'zinc250k'
+    remove_h: True
+    pin_memory: True
+    num_workers: 16
+    datadir: 'data/zinc250k/'
+    rand_perm: True
 
 general:
     # General settings
     name: 'graph-tf-model'      # Warning: 'debug' and 'test' are reserved name that have a special behavior
 
-    forward_visualization: False
+    process_visualization: False
     sample_visualization: False
-    vis_number: 10
+    vis_number: 5
 
     wandb: 'disabled'             # online | offline | disabled
-    gpus: [0, ]                     # Multi-gpu is not implemented on this branch
+    gpus: [0,]                     # Multi-gpu is not implemented on this branch
 
     resume: null            # If resume, path to ckpt file from outputs directory in main directory
-    test_only: # null         # Use absolute path
+    test_only: null         # Use absolute path
 
-    check_val_every_n_epochs: 5000
+    check_val_every_n_epochs: 100
     sample_every_val: 1
     val_check_interval: null
-    samples_to_generate: 200      # We advise to set it to 2 x batch_size maximum
+    samples_to_generate: 10000       # We advise to set it to 2 x batch_size maximum
     samples_to_save: 20
     chains_to_save: 1
     log_every_steps: 50
     number_chain_steps: 50        # Number of frames in each gif
 
-    final_model_samples_to_generate: 300 #3096
+    final_model_samples_to_generate: 10000
     final_model_samples_to_save: 20
     final_model_chains_to_save: 20
     evaluate_all_checkpoints: False
 
 train:
     # Training settings
-    n_epochs: 1000000
-    batch_size: 128
+    n_epochs: 10000
+    batch_size: 256
     lr: 0.0002
     clip_grad: 1.0          # float, null to disable
     save_model: True
     num_workers: 0
-    ema_decay: 0.999          # 'Amount of EMA decay, 0 means off. A reasonable value  is 0.999.'
+    ema_decay: 0.999           # 'Amount of EMA decay, 0 means off. A reasonable value  is 0.999.'
     progress_bar: false
     weight_decay: 1e-12
     optimizer: adamw # adamw,nadamw,nadam => nadamw for large batches, see http://arxiv.org/abs/2102.06356 for the use of nesterov momentum with large batches
@@ -59,16 +55,18 @@ model:
     transition: 'marginal'                          # uniform or marginal
     model: 'graph_tf'
     diffusion_steps: 1000
-    n_layers: 6
+    diffusion_noise_schedule: 'cosine'              # 'cosine', 'polynomial_2'
+    n_layers: 9
 
     extra_features:          # 'all', 'cycles', 'eigenvalues' or null
-    high_order: False
-    # Do not set hidden_mlp_E, dim_ffE too high, computing large tensors on the edges is costly
 
+    # Do not set hidden_mlp_E, dim_ffE too high, computing large tensors on the edges is costly
+    # At the moment (03/08), y contains quite little information
     hidden_mlp_dims: {'X': 256, 'E': 128, 'y': 128}
 
     # The dimensions should satisfy dx % n_head == 0
     hidden_dims : {'dx': 256, 'de': 64, 'dy': 64, 'n_head': 8, 'dim_ffX': 256, 'dim_ffE': 128, 'dim_ffy': 128}
+    high_order: False
 
     lambda_train: [5, 0]
 
@@ -79,16 +77,13 @@ model:
         node: [0.9, 0.09]    # originally 0.39
         edge: [0.9, 0.09]    # originally 0.6
 
-    eta:
-        node: [1000, 30, 10]  # [1000, 10, 1]
-        edge: [1000, 30, 10]
-
+    eta: [100, 100, 100, 100]
     input_space: 'logit' # 'logit' or 'original'
     pre_condition: True
 
-    noise_feat_type: 'deg' # 'deg', 'eig', 'all', None
-    default_min_max: [-1., 1.]  # None
-    max_feat_num: [10, 1, 1]
+    noise_feat_type: # 'deg'
+    default_min_max:: # 'deg'
+    max_feat_num: 40
 
     cibcentration_m: False
     concentration_strategy: 'deg' # 'deg', 'central', 'betweenness'
