@@ -983,7 +983,7 @@ class GraphBetaDiffusion(pl.LightningModule):
                 plt.savefig(os.path.join(result_path, f'{diffusion_process}_Matrix_Process.png', ))
 
 
-    def process_visualization(self, datamodule, given_t_split=20):
+    def forward_visualization(self, datamodule, given_t_split=20):
 
         data = next(iter(datamodule.test_dataloader()))
 

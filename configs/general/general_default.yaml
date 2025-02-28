@@ -2,7 +2,7 @@
 name: 'graph-tf-model'      # Warning: 'debug' and 'test' are reserved name that have a special behavior
 
 
-process_visualization: True
+forward_visualization: False
 sample_visualization: False
 vis_number: 5
 

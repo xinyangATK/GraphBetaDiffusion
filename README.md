@@ -46,7 +46,7 @@ The configurations are provided in the ```config/``` directory in ```YAML``` for
 ### 3. Training 
 Training GBD on general and biochemical graph benchmark:
 ```
-CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset>
+CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py +experiment=<dataset>.yaml
 ```
 
 Training GBD with **Concentration Modulation** technique:
@@ -60,8 +60,11 @@ For the **new** dataset, custom concentration modulation strategy can be defined
 
 ### 4. Generation and Evaluation
 ![Overview of GBD](assets/sample.png)
+
+Provide the ```path``` of checkpoints for ```general.resume``` or ```general.test_only```, then run the follow command to generate samples.
+
 ```
-CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type sample --config <dataset>
+CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py +experiment=<dataset>.yaml
 ```
 
 <a name="visualization"></a>
@@ -70,7 +73,11 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type sample --config <dataset>
 
 Edge generation process of GBD with **concentration modulation defined by node degree** on  `Community-small` dataset.
 
+```
+CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py +experiment=<dataset>.yaml general.sample_visualization=True.
+```
 
+Set ```forward_visualization=True``` or ```general.sample_visualization=True```general. for visualization of forward process or reverse process by graph beta diffusion.
 
 <a name="acknowledgements"></a>
 ## Acknowledgements

@@ -15,8 +15,8 @@ general:
     # General settings
     name: 'graph-tf-model'      # Warning: 'debug' and 'test' are reserved name that have a special behavior
 
-    process_visualization: False
-    sample_visualization: True
+    forward_visualization: False
+    sample_visualization: False
     vis_number: 10
 
     wandb: 'disabled'             # online | offline | disabled

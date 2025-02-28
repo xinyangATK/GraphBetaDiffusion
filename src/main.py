@@ -118,8 +118,8 @@ def main(cfg: DictConfig):
         callbacks.append(last_ckpt_save)
         callbacks.append(checkpoint_callback)
 
-    if cfg.general.process_visualization:
-        model.process_visualization(datamodule, given_t_split=50)
+    if cfg.general.forward_visualization:
+        model.forward_visualization(datamodule, given_t_split=50)
         return
 
 
