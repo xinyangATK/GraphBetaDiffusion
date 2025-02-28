@@ -24,7 +24,7 @@ In this repo, we will release (**updating**):
   - Configurations 
   - Training 
   - Generation and Evaluation
-- Visualization &#x1F4CC;
+- Visualization &#x2705;
 
 
 <a name="environment dependencies"></a>
