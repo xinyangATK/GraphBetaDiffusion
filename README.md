@@ -77,7 +77,7 @@ Edge generation process of GBD with **concentration modulation defined by node d
 CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py +experiment=<dataset>.yaml general.sample_visualization=True.
 ```
 
-Set ```forward_visualization=True``` or ```general.sample_visualization=True```general. for visualization of forward process or reverse process by graph beta diffusion.
+Set ```forward_visualization=True``` or ```general.sample_visualization=True```general. for visualization of forward process or reverse process by graph beta diffusion. **(currently only supports general graph)**
 
 <a name="acknowledgements"></a>
 ## Acknowledgements
