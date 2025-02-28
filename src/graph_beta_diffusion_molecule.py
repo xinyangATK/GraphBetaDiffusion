@@ -128,8 +128,10 @@ class GraphBetaDiffusion(pl.LightningModule):
         self.noise_feat_type = self.cfg.model.noise_feat_type
 
         self.pre_cond = PreConditionMoudle(self.Scale, self.Shift, (self.prob_X, self.prob_E))
-        self.con_module = GeneralGraphConcentrationModule(self.eta, concentration_modulation=None)
-        self.threshold_list = self.con_module.get_threshold_list(self.cfg.dataset.name)
+        self.concentraion_m = cfg.model.concentration_m
+        if self.concentraion_m:
+            self.con_module = GeneralGraphConcentrationModule(self.eta, concentration_strategy=cfg.model.concentration_strategy)
+            self.threshold_list = self.con_module.get_threshold_list(self.cfg.dataset.name)
 
         self.log2file = myloggger(os.path.join(os.getcwd(), f'res.txt'))
 
@@ -253,10 +255,15 @@ class GraphBetaDiffusion(pl.LightningModule):
         #     X, E, node_mask = order_graph(X, E, node_mask, node_idx)
 
         # allpy different eta on edge depends on ordered nodes
-        concentration_value = self.con_module.get_value(self.cfg.dataset.name, node_feat=X, adj=E)
-        eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
-        eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
-        eta_pair = (eta_x, eta_e)
+        if concentration_value is None:
+            assert self.concentration_m == False
+            eta_x, eta_e = self.eta['node'][0], self.eta['edge'][0]
+            eta_pair = (eta_x, eta_e)
+        else:
+            concentration_value = self.con_module.get_value(self.cfg.dataset.name, node_feat=X, adj=E)
+            eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
+            eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
+            eta_pair = (eta_x, eta_e)
 
         X = self.scale_shift(X, type='node')
         E = self.scale_shift(E, type='edge')
@@ -649,9 +656,14 @@ class GraphBetaDiffusion(pl.LightningModule):
         X_s = 0.01 * torch.ones(batch_size, N, max_feat_num, device=self.device)
         E_s = 0.01 * torch.ones(batch_size, N, N, 1, device=self.device)
 
-        eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
-        eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
-        eta_pair = (eta_x, eta_e)
+        if concentration_value is None:
+            assert self.concentration_m == False
+            eta_x, eta_e = self.eta['node'][0], self.eta['edge'][0]
+            eta_pair = (eta_x, eta_e)
+        else:
+            eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
+            eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
+            eta_pair = (eta_x, eta_e)
 
         X_s = self.scale_shift(X_s, type='node')
         E_s = self.scale_shift(E_s, type='edge')
@@ -874,10 +886,15 @@ class GraphBetaDiffusion(pl.LightningModule):
             node_idx = torch.argsort(E.sum((-1, -2)), dim=1, descending=True)
             X, E, node_mask = order_graph(X, E, node_mask, node_idx)
 
-            concentration_value = self.con_module.get_value(self.cfg.dataset.name, node_feat=X, adj=E)
-            eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
-            eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
-            eta_pair = (eta_x, eta_e)
+            if self.concentration_m:
+                concentration_value = self.con_module.get_value(self.cfg.dataset.name, node_feat=X, adj=E)
+                eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
+                eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
+                eta_pair = (eta_x, eta_e)
+            else:
+                eta_x, eta_e = self.eta['node'][0], self.eta['edge'][0]
+                eta_pair = (eta_x, eta_e)
+
 
             # Follow the steps in Beta Diffusion.
             # noisy_data in original/logit input_space
@@ -986,11 +1003,11 @@ class GraphBetaDiffusion(pl.LightningModule):
         self.visualization_graph_matrix(X, E, node_mask, given_t_split, graph=True, matrix=True)
 
     def sample_visualization(self, to_sample=5, given_t_split=20):
-        if self.cfg.model.eta_from == 'train':
-            sample_deg, nodes_num = self.sample_from_train(to_sample, re_deg=True, re_feat=False)
-        # else:
-        #     sample_extra_feat, nodes_num = None, None
-        chain_X, chain_E, node_mask = self.sample_batch(batch_size=to_sample, num_nodes=nodes_num, concentration_value=sample_deg,
+        if self.cfg.model.cibcentration_m:
+            sample_extra_feat, nodes_num = self.sample_from_train(to_sample, re_deg=True, re_feat=False)
+        else:
+            sample_extra_feat, nodes_num = None, None
+        chain_X, chain_E, node_mask = self.sample_batch(batch_size=to_sample, num_nodes=nodes_num, concentration_value=sample_extra_feat,
                                                         num_chain_step=given_t_split, keep_chain=to_sample)
 
         # X = torch.stack(chain_X, dim=0)

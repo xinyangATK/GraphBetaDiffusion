@@ -29,7 +29,7 @@ In this repo, we will release (**updating**):
 
 <a name="environment dependencies"></a>
 ## Environment Dependencies
-Our code was built on [DiGress](https://arxiv.org/abs/2209.14734), please refer to the [Environment installation]((https://github.com/cvignac/DiGress?tab=readme-ov-file#environment-installation)) in **DiGress**.
+Our code was built on [DiGress](https://arxiv.org/abs/2209.14734), please refer to the [Environment installation](https://github.com/cvignac/DiGress?tab=readme-ov-file#environment-installation) in **DiGress**.
 
 
 <a name="reproducing experiments"></a>
@@ -46,7 +46,7 @@ The configurations are provided in the ```config/``` directory in ```YAML``` for
 ### 3. Training 
 Training GBD on general and biochemical graph benchmark:
 ```
-CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset> --seed 0
+CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py --type train --config <dataset>
 ```
 
 Training GBD with **Concentration Modulation** technique:

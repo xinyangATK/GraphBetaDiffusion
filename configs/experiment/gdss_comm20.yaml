@@ -91,6 +91,8 @@ model:
     max_feat_num: [10, 1, 1]
 
     eta_from: 'train'
+    cibcentration_m: False
+    concentration_strategy: 'deg' # 'deg', 'central', 'betweenness'
 
 hydra:
   job:

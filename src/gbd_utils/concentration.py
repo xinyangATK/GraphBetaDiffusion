@@ -5,10 +5,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class GeneralGraphConcentrationModule(object):
-    def __init__(self, eta, concentration_modulation=None):
+    def __init__(self, eta, concentration_strategy=None):
         super().__init__()
         self.eta = eta
-        self.concentration_modulation = concentration_modulation
+        self.concentration_strategy = concentration_strategy
     
     def get_threshold_list(self, dataset, threshold_list=None):
         if threshold_list is not None:
