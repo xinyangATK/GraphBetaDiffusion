@@ -14,14 +14,14 @@ class GenericGraphDataset(InMemoryDataset):
         self.data_cfg = data_cfg
         raw_data_dir = "https://github.com/harryjo97/GDSS/raw/master/data"
         self.path_mappings = {
-            'gdss-comm20': "community_small.pkl",
-            'gdss-ego': "ego_small.pkl",
+            'comm20': "community_small.pkl",
+            'ego': "ego_small.pkl",
             'sbm': "sbm.pkl",
             'planar': "planar.pkl"
         }
         self.url_mappings = {
-            'gdss-comm20': raw_data_dir + "/community_small.pkl",
-            'gdss-ego': raw_data_dir + "/ego_small.pkl",
+            'omm20': raw_data_dir + "/community_small.pkl",
+            'ego': raw_data_dir + "/ego_small.pkl",
             'sbm': raw_data_dir + "/sbm.pkl",
             'planar': raw_data_dir + "/planar.pkl"
         }
@@ -29,10 +29,10 @@ class GenericGraphDataset(InMemoryDataset):
             raise ValueError(f"Undefined dataset '{dataset_name}'.")
 
         self.dataset_name = dataset_name
-        if dataset_name == 'gdss-comm20':
+        if dataset_name == 'comm20':
             self.max_node_num = 20
             self.max_deg_num = 9  # 15, 8, 9, 10, 10
-        elif dataset_name == 'gdss-ego':
+        elif dataset_name == 'ego':
             self.max_node_num = 18
             self.max_deg_num = 17
         elif dataset_name == 'planar':
@@ -64,7 +64,7 @@ class GenericGraphDataset(InMemoryDataset):
         return {'x': x_tensor, 'feat_dim': feat_dim, 'adj': adjs_tensor}
 
     def download(self):
-        if self.dataset_name in ['gdss-comm20', 'gdss-ego']:
+        if self.dataset_name in ['comm20', 'ego']:
             """ download data from https://github.com/harryjo97/GDSS/tree/master/data """
             # raw_path = download_url(self.url_mappings[self.dataset_name], self.raw_dir)
             if not (os.path.exists(self.raw_paths[0]) and os.path.exists(self.raw_paths[2])):
