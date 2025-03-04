@@ -141,7 +141,7 @@ class KLUBs(Metric):
         alpha_t = torch.reshape(alpha_t, (-1, alpha_t.size(-1)))  # [B*n, 1]
         alpha_s = torch.reshape(alpha_s, (-1, alpha_t.size(-1)))
         delta = torch.reshape(delta, (-1, delta.size(-1)))
-        alpha_t_masak = alpha_t[z_mask, :]
+        alpha_t_mask = alpha_t[z_mask, :]
         alpha_s_mask = alpha_s[z_mask, :]
         delta_mask = delta[z_mask, :]
 
@@ -150,10 +150,10 @@ class KLUBs(Metric):
         beta_p = self.eta - self.eta * alpha_s_mask * target
         beta_q = self.eta - self.eta * alpha_s_mask * preds
 
-        _alpha_p = self.eta * alpha_t_masak * target
-        _alpha_q = self.eta * alpha_t_masak * preds
-        _beta_p = self.eta - self.eta * alpha_t_masak * target
-        _beta_q = self.eta - self.eta * alpha_t_masak * preds
+        _alpha_p = self.eta * alpha_t_mask * target
+        _alpha_q = self.eta * alpha_t_mask * preds
+        _beta_p = self.eta - self.eta * alpha_t_mask * target
+        _beta_q = self.eta - self.eta * alpha_t_mask * preds
 
         KLUB_conditional = (self.KL_gamma(alpha_q, alpha_p).clamp(0) \
                             + self.KL_gamma(beta_q, beta_p).clamp(0) \
