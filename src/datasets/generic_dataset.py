@@ -7,7 +7,7 @@ import torch_geometric.utils
 from torch_geometric.data import InMemoryDataset, download_url
 
 from src.datasets.abstract_dataset import AbstractDataModule, AbstractDatasetInfos
-from src.GDSS_utils.utils.graph_utils import graphs_to_tensor, init_features
+from src.gdss_utils.utils.graph_utils import graphs_to_tensor, init_features
 
 class GenericGraphDataset(InMemoryDataset):
     def __init__(self, dataset_name, split, root, transform=None, pre_transform=None, pre_filter=None, data_cfg=None):
@@ -20,7 +20,7 @@ class GenericGraphDataset(InMemoryDataset):
             'planar': "planar.pkl"
         }
         self.url_mappings = {
-            'omm20': raw_data_dir + "/community_small.pkl",
+            'comm20': raw_data_dir + "/community_small.pkl",
             'ego': raw_data_dir + "/ego_small.pkl",
             'sbm': raw_data_dir + "/sbm.pkl",
             'planar': raw_data_dir + "/planar.pkl"
@@ -31,7 +31,7 @@ class GenericGraphDataset(InMemoryDataset):
         self.dataset_name = dataset_name
         if dataset_name == 'comm20':
             self.max_node_num = 20
-            self.max_deg_num = 9  # 15, 8, 9, 10, 10
+            self.max_deg_num = 10  # 15, 8, 9, 10, 10
         elif dataset_name == 'ego':
             self.max_node_num = 18
             self.max_deg_num = 17
@@ -64,11 +64,13 @@ class GenericGraphDataset(InMemoryDataset):
         return {'x': x_tensor, 'feat_dim': feat_dim, 'adj': adjs_tensor}
 
     def download(self):
+        if not os.path.isdir(self.raw_dir):
+            os.makedirs(self.raw_dir)
         if self.dataset_name in ['comm20', 'ego']:
             """ download data from https://github.com/harryjo97/GDSS/tree/master/data """
             # raw_path = download_url(self.url_mappings[self.dataset_name], self.raw_dir)
             if not (os.path.exists(self.raw_paths[0]) and os.path.exists(self.raw_paths[2])):
-                raw_path = os.path.join(self.raw_dir, self.path_mappings[self.dataset_name])
+                raw_path = os.path.join(pathlib.Path(self.raw_dir).parents[1], self.path_mappings[self.dataset_name])
                 with open(raw_path, 'rb') as f:
                     graph_list = pickle.load(f)
 

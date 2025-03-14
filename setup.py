@@ -1,11 +1,10 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='DiGress',
+    name='GBD',
     version='1.0.1',
     url=None,
-    author='C.V., I.K., A.S.',
     author_email='author@gmail.com',
-    description='Discrete denoising diffusion for graph generation',
+    description='Advancing Graph Generation through Beta Diffusion',
     packages=find_packages()
 )

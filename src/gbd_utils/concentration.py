@@ -15,9 +15,9 @@ class GeneralGraphConcentrationModule(object):
             return threshold_list
         
         if self.concentration_strategy == 'deg':
-            if dataset == 'gdss-comm20':
+            if dataset == 'comm20':
                 threshold_list = [0.8, 0.4]
-            elif dataset == 'gdss-ego': 
+            elif dataset == 'ego': 
                 # TODO
                 threshold_list = [0.8, 0.4]
             elif dataset == 'planar':
@@ -28,9 +28,9 @@ class GeneralGraphConcentrationModule(object):
                 threshold_list = [0.8, 0.4]     
         elif self.concentration_strategy == 'central':
             #TODO
-            if dataset == 'gdss-comm20':
+            if dataset == 'comm20':
                 threshold_list = [0.8, 0.4]
-            elif dataset == 'gdss-ego': 
+            elif dataset == 'ego': 
                 # TODO
                 threshold_list = [0.8, 0.4]
             elif dataset == 'planar':
@@ -41,9 +41,9 @@ class GeneralGraphConcentrationModule(object):
                 threshold_list = [0.8, 0.4]  
         elif self.concentration_strategy == 'betweenness':
             #TODO
-            if dataset == 'gdss-comm20':
+            if dataset == 'comm20':
                 threshold_list = [0.8, 0.4]
-            elif dataset == 'gdss-ego': 
+            elif dataset == 'ego': 
                 # TODO
                 threshold_list = [0.8, 0.4]
             elif dataset == 'planar':
@@ -64,12 +64,14 @@ class GeneralGraphConcentrationModule(object):
             value = value / torch.max(value, dim=-1, keepdim=True)[0]
         else:
             raise ValueError('Wrong concentration strategy')
+        
+        return value
     
     def get_eta_x(self, eta_x, value=None, threshold_list=None):
         '''Concentration modulation for eta'''
-        modulation_eta = 10. * torch.ones_like(eta_x)
 
         if (value is not None) and (threshold_list is not None):
+            modulation_eta = 10. * torch.ones_like(value)
             assert (eta_x.size(0) == len(threshold_list) + 1)
 
             for level in range(len(threshold_list)):

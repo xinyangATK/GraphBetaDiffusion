@@ -10,15 +10,15 @@ class PreConditionMoudle(object):
         self.Shift = Shift
         self.Scale = Scale
 
-        prob = self.get_discrete_prob(self.dataset_name, prob, num_classes=2)
+        prob = self.get_discrete_prob(self.dataset_name, num_classes=2)
         if isinstance(prob, tuple):
             self.prob_X, self.prob_E = prob
         else:
             self.prob_X = self.prob_E = prob
 
-    def get_discrete_prob(self, dataset_name, prob, num_classes=None):
-        if prob is None:
-            return None
+    def get_discrete_prob(self, dataset_name, prob=None, num_classes=None):
+        if prob is not None:
+            return prob
         if dataset_name == 'comm20':
             prob_X = torch.tensor([0.0000, 0.0393, 0.2376, 0.2376, 0.2192, 0.1394, 0.0910, 0.0340, 0.0020])
             prob_E = torch.tensor([0.2914]) 
@@ -132,7 +132,7 @@ class PreConditionMoudle(object):
 
     def pre_condition_fn(self, alpha_t, eta, type='node', prior_prob=None, input_space='logit'):
 
-        bounds = torch.tensor([self.Shift[type], self.Scale[type] + self.Shift[type]]).to(self.device)
+        bounds = torch.tensor([self.Shift[type], self.Scale[type] + self.Shift[type]])
 
         if prior_prob is None:
             mean_t, std_t = self.get_logit_beta_stats_con(bounds=bounds, eta=eta, alpha_t=alpha_t)

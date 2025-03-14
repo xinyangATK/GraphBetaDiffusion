@@ -97,4 +97,4 @@ hydra:
   job:
     chdir: True
   run:
-    dir: ../outputs/${dataset.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}-${general.name}
+    dir: ./outputs/${dataset.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}-${general.name}

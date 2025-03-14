@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 import networkx as nx
 import numpy as np
-from src.GDSS_utils.utils.node_features import EigenFeatures
+from gdss_utils.utils.node_features import EigenFeatures
 
 # -------- Mask batch of node features with 0-1 flags tensor --------
 def mask_x(x, flags):

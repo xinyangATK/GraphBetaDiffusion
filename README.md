@@ -36,35 +36,69 @@ Our code was built on [DiGress](https://arxiv.org/abs/2209.14734), please refer 
 ## Reproducing Experiments
 
 ### 1. Dataset preparations
+We provide two commands for generating general graph datasets as follows:
+
+```
+python src/datasets/data_generators_gdss.py --dataset <dataset> 
+```
+where `<dataset>` is one of the general graph datasets: `community_small`, `ego_small` and `grid`. This will create the `<dataset>.pkl` file in the data directory.
+
+```
+python src/datasets/data_generators_grum.py --dataset <dataset> --mmd
+```
+where `<dataset>` is one of the general graph datasets: `planar` and `sbm`. This will create the `<dataset>.pkl` file in the data directory.
+
+For the molecule datasets:
+```
+python src/datasets/preprocess.py --dataset <dataset>
+python src/datasets/preprocess_for_nspdk.py --dataset <dataset>
+```
+ where `<dataset>` is one of the 2d molecule datasets: `qm9` and `zinc250k`.
+
+**Note that the `.pkl/.pt` files are saved in `./data/raw/<dataset>`**, if the directory is not found, please build the directory manually.
+
+**Optional:**
 
 For `Community-small`, `Ego-small` and `Grid` datasets, please refer to [GDSS](https://github.com/harryjo97/GDSS).\
 For `Planar`, `SBM`, `QM9` and `ZINC250k` datasets, please refer to [GruM](https://github.com/harryjo97/GruM/tree/master/GruM_2D#1-dataset-preparations).
 
+For the evaluation of general graph generation tasks, run the following command to compile the [ORCA program](http://www.biolab.si/supp/orca/orca.html).
+
+```
+cd src/analysis/orca 
+g++ -O2 -std=c++11 -o orca orca.cpp
+```
+
 ### 2. Configurations
-The configurations are provided in the ```config/``` directory in ```YAML``` format. Hyperparameters used in the experiments are specified in the Appendix E of our paper.
+The configurations are provided in the `config/` directory in `YAML` format. Hyperparameters used in the experiments are specified in the Appendix E of our paper.
 
 ### 3. Training 
 Training GBD on general and biochemical graph benchmark:
 ```
-CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py +experiment=<dataset>.yaml
+python src/main.py +experiment=<dataset>.yaml general.gps=[0,1,2,3] 
 ```
 
 Training GBD with **Concentration Modulation** technique:
 
-- Set ```concentration_m = True``` in experiment configs for traing GBD with concentration modulation technique!
-- We provide specialized concentration modulation strategies for different datasets in ```concentration.py```. 
+- Set `concentration_m = True` in experiment configs for traing GBD with concentration modulation technique!
+- We provide specialized concentration modulation strategies for different datasets in `concentration.py`. 
 
-For the **new** dataset, custom concentration modulation strategy can be defined in a similar way with ```CustomConcentrationModule``` module.
+For the **new** dataset, custom concentration modulation strategy can be defined in a similar way with `CustomConcentrationModule` module.
 
 
 
 ### 4. Generation and Evaluation
 ![Overview of GBD](assets/sample.png)
 
-Provide the ```path``` of checkpoints for ```general.resume``` or ```general.test_only```, then run the follow command to generate samples.
+Provide the `path` of checkpoints for `general.resume` or `general.test_only`, then run the follow command to generate samples.
 
 ```
-CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py +experiment=<dataset>.yaml
+python src/main.py +experiment=<dataset>.yaml
+```
+or
+
+```
+python src/main.py +experiment=<dataset>.yaml general.resume='to/your/path'
 ```
 
 <a name="visualization"></a>
@@ -74,10 +108,10 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py +experiment=<dataset>.yaml
 Edge generation process of GBD with **concentration modulation defined by node degree** on  `Community-small` dataset.
 
 ```
-CUDA_VISIBLE_DEVICES=0,1,2,3 python main.py +experiment=<dataset>.yaml general.sample_visualization=True.
+python main.py +experiment=<dataset>.yaml general.sample_visualization=True.
 ```
 
-Set ```general.forward_visualization=True``` or ```general.sample_visualization=True``` in config file for visualization of forward process or reverse process by graph beta diffusion. **(currently only supports general graph)**
+Set `general.forward_visualization=True` or `general.sample_visualization=True` in config file for visualization of forward process or reverse process by graph beta diffusion. **(currently only supports general graph)**
 
 <a name="acknowledgements"></a>
 ## Acknowledgements

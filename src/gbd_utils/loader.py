@@ -4,15 +4,15 @@ import torch
 import pickle
 from pathlib import Path
 from pytorch_lightning.callbacks import ModelCheckpoint
-from GDSS_utils.utils.ema import ExponentialMovingAverage, LitEma
+from gdss_utils.utils.ema import ExponentialMovingAverage, LitEma
 
 
-dataset_space = ['gdss-comm20', 'gdss-ego', 'qm9', 'zinc250k', 'planar', 'sbm']
+dataset_space = ['comm20', 'ego', 'qm9', 'zinc250k', 'planar', 'sbm']
 
 def load_model(cfg, **model_kwargs):
     dataset = cfg.dataset.name
     
-    if dataset in ['gdss-comm20', 'gdss-ego', 'planar', 'sbm']:
+    if dataset in ['comm20', 'ego', 'planar', 'sbm']:
         from graph_beta_diffusion_general import GraphBetaDiffusion
     elif dataset in ['qm9', 'zinc250k']:
         from graph_beta_diffusion_molecule import GraphBetaDiffusion
@@ -28,7 +28,7 @@ def load_model_from_ckpt(cfg, **model_kwargs):
     dataset = cfg.dataset.name
     resume = cfg.general.test_only
 
-    if dataset in ['gdss-comm20', 'gdss-ego', 'planar', 'sbm']:
+    if dataset in ['comm20', 'ego', 'planar', 'sbm']:
         from graph_beta_diffusion_general import GraphBetaDiffusion
     elif dataset in ['qm9', 'zinc250k']:
         from graph_beta_diffusion_molecule import GraphBetaDiffusion
@@ -63,18 +63,19 @@ def save_ema(model_ema, current_epoch, ckpt_dir):
 
 def load_general_graph_list(dataset):
         current_file = Path(__file__).resolve()
-        raw_dir = f"{current_file.parents[3]}/data/{dataset}/raw"
+        raw_dir = f"{current_file.parents[2]}/data/"
 
-        if dataset in ['gdss-comm20', 'gdss-ego']:
-            pkl_name = 'community_small' if dataset == 'gdss-comm20' else 'ego_small'
+        if dataset in ['comm20', 'ego']:
+            pkl_name = 'community_small' if dataset == 'comm20' else 'ego'
             file_path = os.path.join(raw_dir, f'{pkl_name}.pkl')
-            with open(file_path) as f:
+            print(file_path)
+            with open(file_path, 'rb') as f:
                 graph_list = pickle.load(f)
             test_size = int(0.2 * len(graph_list))
             train_graph_list, test_graph_list = graph_list[test_size:], graph_list[:test_size]
         elif dataset in ['sbm', 'planar']:
             file_path = os.path.join(raw_dir, f'{pkl_name}.pkl')
-            with open(file_path) as f:
+            with open(file_path, 'rb') as f:
                 train_graph_list, val_graph_list, test_graph_list = pickle.load(f)
             train_graph_list, test_graph_list = train_graph_list, test_graph_list
         else:

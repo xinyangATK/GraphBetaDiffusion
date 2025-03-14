@@ -4,8 +4,8 @@ from torch.utils.data import TensorDataset, DataLoader
 import pickle
 import os, sys
 
-from src.GDSS_utils.utils.graph_utils import node_flags, graphs_to_tensor, mask_x
-from src.GDSS_utils.utils.node_features import EigenFeatures
+from src.gdss_utils.utils.graph_utils import node_flags, graphs_to_tensor, mask_x
+from src.gdss_utils.utils.node_features import EigenFeatures
 sys.path.append(os.path.abspath(os.getcwd()))
 # -------- Create initial node features --------
 def init_features(config_data, adjs):

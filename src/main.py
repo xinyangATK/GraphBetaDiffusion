@@ -1,7 +1,7 @@
-# import graph_tool as gt
-
+import graph_tool as gt
 import logging
 import os, sys
+sys.path.append(os.path.abspath(os.getcwd()))
 import pathlib
 import warnings
 import pytorch_lightning.loggers
@@ -17,6 +17,7 @@ from src import utils
 from diffusion.extra_features import DummyExtraFeatures
 from src.gbd_utils.loader import load_model, load_model_from_ckpt
 from src.gbd_utils.evaluate import EVAL_METRICS
+
 
 
 warnings.filterwarnings("ignore", category=PossibleUserWarning)

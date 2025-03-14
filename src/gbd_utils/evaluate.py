@@ -7,10 +7,10 @@ import pickle
 import math
 import torch
 from torch_geometric.utils import to_networkx
-from GDSS_utils.utils.graph_utils import adjs_to_graphs, init_flags, quantize, quantize_mol
-from GDSS_utils.evaluation.stats import eval_graph_list, nspdk_stats
-from GDSS_utils.utils.mol_utils import gen_mol, mols_to_smiles, load_smiles, canonicalize_smiles, mols_to_nx
-from GDSS_utils.evaluation.molsets import get_all_metrics
+from gdss_utils.utils.graph_utils import adjs_to_graphs, init_flags, quantize, quantize_mol
+from gdss_utils.evaluation.stats import eval_graph_list, nspdk_stats
+from gdss_utils.utils.mol_utils import gen_mol, mols_to_smiles, load_smiles, canonicalize_smiles, mols_to_nx
+from gdss_utils.evaluation.molsets import get_all_metrics
 
 class EVAL_METRICS:
     def __init__(self, dataset, num_mols=10000):

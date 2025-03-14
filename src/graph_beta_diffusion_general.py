@@ -127,8 +127,8 @@ class GraphBetaDiffusion(pl.LightningModule):
 
         self.noise_feat_type = self.cfg.model.noise_feat_type
 
-        self.pre_cond = PreConditionMoudle(self.Scale, self.Shift, (self.prob_X, self.prob_E))
-        self.con_module = GeneralGraphConcentrationModule(self.eta, concentration_modulation=None)
+        self.pre_cond = PreConditionMoudle(self.cfg.dataset.name, self.Scale, self.Shift)
+        self.con_module = GeneralGraphConcentrationModule(self.eta, concentration_strategy=self.cfg.model.concentration_strategy)
         self.threshold_list = self.con_module.get_threshold_list(self.cfg.dataset.name)
 
         self.log2file = myloggger(os.path.join(os.getcwd(), f'res.txt'))
@@ -269,20 +269,20 @@ class GraphBetaDiffusion(pl.LightningModule):
 
         if self.pre_condition:
             if self.cfg.model.noise_feat_type == 'deg':
-                mean_logit_X_t, std_logit_X_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node', prior_prob=self.prob_X)
+                mean_logit_X_t, std_logit_X_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node', prior_prob=self.pre_cond.prob_X)
                 noisy_data['X_t'] = (noisy_data['X_t'] - mean_logit_X_t) / std_logit_X_t
             elif self.cfg.model.noise_feat_type == 'eig':
                 mean_logit_X_t, std_logit_X_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node')
                 noisy_data['X_t'] = (noisy_data['X_t'] - mean_logit_X_t) / std_logit_X_t
             elif self.cfg.model.noise_feat_type == 'all':
-                mean_logit_X_deg_t, std_logit_X_deg_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node', prior_prob=self.prob_X)
+                mean_logit_X_deg_t, std_logit_X_deg_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node', prior_prob=self.pre_cond.prob_X)
                 mean_logit_X_eig_t, std_logit_X_eig_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node')
                 noisy_data['X_t'][..., :-2] = (noisy_data['X_t'][..., :-2] - mean_logit_X_deg_t) / std_logit_X_deg_t
                 noisy_data['X_t'][..., -2:] = (noisy_data['X_t'][..., -2:] - mean_logit_X_eig_t) / std_logit_X_eig_t
             else:
                 pass
 
-            mean_logit_E_t, std_logit_E_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'].unsqueeze(-1), eta_pair[1], type='edge', prior_prob=self.prob_E)
+            mean_logit_E_t, std_logit_E_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'].unsqueeze(-1), eta_pair[1], type='edge', prior_prob=self.pre_cond.prob_E)
             noisy_data['E_t'] = (noisy_data['E_t'] - mean_logit_E_t) / std_logit_E_t
 
             noisy_data['X_t'], noisy_data['E_t'] = self.mask_and_sym(noisy_data['X_t'], noisy_data['E_t'], node_mask)
