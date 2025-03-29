@@ -11,7 +11,7 @@ general:
     # General settings
     name: 'graph-tf-model'      # Warning: 'debug' and 'test' are reserved name that have a special behavior
 
-    process_visualization: False
+    forward_visualization: False
     sample_visualization: False
     vis_number: 5
 
@@ -21,7 +21,7 @@ general:
     resume: null            # If resume, path to ckpt file from outputs directory in main directory
     test_only: #/media/ubuntu/6EAA3539AA34FEE1/LXY/GraphGeneration/BetaGraph_eta/outputs/qm9/2024-05-02/00-34-18-graph-tf-model/checkpoints/graph-tf-model/epoch=999-v1.ckpt         # Use absolute path
 
-    check_val_every_n_epochs: 200
+    check_val_every_n_epochs: 1000
     sample_every_val: 1
     val_check_interval: null
     samples_to_generate: 10000       # We advise to set it to 2 x batch_size maximum
@@ -38,7 +38,7 @@ general:
 train:
     # Training settings
     n_epochs: 10000
-    batch_size: 2048
+    batch_size: 512
     lr: 0.0002
     clip_grad: 1.0          # float, null to disable
     save_model: True
@@ -92,8 +92,10 @@ model:
     default_min_max: # 'deg'
     max_feat_num: 5
 
-    cibcentration_m: False
-    concentration_strategy: 'deg' # 'deg', 'central', 'betweenness'
+    concentration_m: False
+    concentration_strategy: 'atom' # 'deg', 'central', 'betweenness'
+
+    eta_from: 'train'
 
 
 hydra:

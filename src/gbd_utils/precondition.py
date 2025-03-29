@@ -5,20 +5,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class PreConditionMoudle(object):
-    def __init__(self, dataset_name, Shift, Scale):
+    def __init__(self, dataset_name, dataset_info, Shift, Scale):
         self.dataset_name = dataset_name
         self.Shift = Shift
         self.Scale = Scale
 
-        prob = self.get_discrete_prob(self.dataset_name, num_classes=2)
+        prob = self.get_discrete_prob(self.dataset_name, dataset_info, num_classes=2)
         if isinstance(prob, tuple):
             self.prob_X, self.prob_E = prob
         else:
             self.prob_X = self.prob_E = prob
 
-    def get_discrete_prob(self, dataset_name, prob=None, num_classes=None):
+    def get_discrete_prob(self, dataset_name, dataset_info, prob=None, num_classes=None):
         if prob is not None:
             return prob
+        
         if dataset_name == 'comm20':
             prob_X = torch.tensor([0.0000, 0.0393, 0.2376, 0.2376, 0.2192, 0.1394, 0.0910, 0.0340, 0.0020])
             prob_E = torch.tensor([0.2914]) 
@@ -29,7 +30,8 @@ class PreConditionMoudle(object):
         elif dataset_name == 'sbm':
             ValueError('Not implenmted. The code will Coming soon.')
         elif dataset_name == 'qm9':
-            ValueError('Not implenmted. The code will Coming soon.')
+            prob_X = dataset_info.node_types
+            prob_E = dataset_info.edge_types_new
         elif dataset_name == 'zinc250k':
             ValueError('Not implenmted. The code will Coming soon.')
         else:
@@ -137,20 +139,14 @@ class PreConditionMoudle(object):
         if prior_prob is None:
             mean_t, std_t = self.get_logit_beta_stats_con(bounds=bounds, eta=eta, alpha_t=alpha_t)
             return mean_t, std_t
+        
 
         if isinstance(prior_prob, torch.Tensor):
-            # prob = (prior_prob, 1 - prior_prob)
-            mean_t_list, std_t_list = [], []
-            for neg_prob, prob in zip(1 - prior_prob, prior_prob):
-                if input_space == 'logit':
-                    mean_t, std_t = self.get_logit_beta_stats(bounds=bounds, eta=eta, alpha_t=alpha_t,
-                                                                probs=(neg_prob, prob))
-                else:
-                    mean_t, std_t = self.get_beta_stats(bounds=bounds, eta=eta, alpha_t=alpha_t, probs=(neg_prob, prob))
-                mean_t_list.append(mean_t)
-                std_t_list.append(std_t)
-            mean_t = torch.concat(mean_t_list, dim=-1)
-            std_t = torch.concat(std_t_list, dim=-1)
+            prior_prob = prior_prob.to(alpha_t.device)
+            if input_space == 'logit':
+                mean_t, std_t = self.get_logit_beta_stats(bounds=bounds, eta=eta, alpha_t=alpha_t, probs=(1 - prior_prob, prior_prob))
+            else:
+                mean_t, std_t = self.get_beta_stats(bounds=bounds, eta=eta, alpha_t=alpha_t, probs=(1 - prior_prob, prior_prob))
         else:
             probs = torch.tensor([1 - prior_prob, prior_prob]).to(self.device)
 

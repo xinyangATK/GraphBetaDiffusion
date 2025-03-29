@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import json
 import networkx as nx
-
+import pathlib
 import re
 from rdkit import Chem, RDLogger
 RDLogger.DisableLog('rdApp.*')
@@ -34,15 +34,16 @@ def load_smiles(dataset='QM9'):
         raw_path = 'zinc250k/raw'
     else:
         raise ValueError('wrong dataset name in load_smiles')
-    
+    current_file = pathlib.Path(__file__).resolve()
+
     try:
-        df = pd.read_csv(f'../../../../data/{raw_path}/{dataset.lower()}.csv')
-        with open(f'../../../../data/{raw_path}/valid_idx_{dataset.lower()}.json') as f:
+        df = pd.read_csv(f'{current_file.parents[3]}/data/{dataset.lower()}.csv')
+        with open(f'{current_file.parents[3]}/data/valid_idx_{dataset.lower()}.json') as f:
             test_idx = json.load(f)
     except:
         print('Runing with terminal...\n')
-        df = pd.read_csv(f'../../../data/{raw_path}/{dataset.lower()}.csv')
-        with open(f'../../../data/{raw_path}/valid_idx_{dataset.lower()}.json') as f:
+        df = pd.read_csv(f'../../../data/{dataset.lower()}.csv')
+        with open(f'../../../data/valid_idx_{dataset.lower()}.json') as f:
             test_idx = json.load(f)
 
     if dataset == 'QM9':

@@ -19,7 +19,7 @@ from src import utils
 import pickle
 from random import sample
 
-from src.gbd_utils.loader import build_ema, save_ema, load_ema, load_general_graph_list
+from src.gbd_utils.loader import build_ema, save_ema, load_ema, load_molecule_list
 
 # Import GDSS utils
 from gdss_utils.utils.mol_utils import *
@@ -30,7 +30,7 @@ import logging
 
 # Import Beta utils
 from gbd_utils.precondition import PreConditionMoudle
-from gbd_utils.concentration import GeneralGraphConcentrationModule
+from gbd_utils.concentration import MoleculeGraphConcentrationModule
 from gbd_utils.graph_utils import *
 
 
@@ -56,6 +56,7 @@ class GraphBetaDiffusion(pl.LightningModule):
         output_dims = dataset_infos.output_dims
         nodes_dist = dataset_infos.nodes_dist
         self.degree_counts = dataset_infos.degree_counts
+        self.atom_dist = dataset_infos.atom_dist
 
         self.cfg = cfg
         self.name = cfg.general.name
@@ -128,7 +129,7 @@ class GraphBetaDiffusion(pl.LightningModule):
         self.noise_feat_type = self.cfg.model.noise_feat_type
 
         self.pre_cond = PreConditionMoudle(self.cfg.dataset.name, dataset_infos, self.Scale, self.Shift)
-        self.con_module = GeneralGraphConcentrationModule(self.eta, concentration_strategy=self.cfg.model.concentration_strategy)
+        self.con_module = MoleculeGraphConcentrationModule(self.eta, concentration_strategy=self.cfg.model.concentration_strategy)
         self.threshold_list = self.con_module.get_threshold_list(self.cfg.dataset.name)
 
         self.log2file = myloggger(os.path.join(os.getcwd(), f'res.txt'))
@@ -228,8 +229,8 @@ class GraphBetaDiffusion(pl.LightningModule):
 
         # allpy different eta on edge depends on ordered nodes
         concentration_value = self.con_module.get_value(self.cfg.dataset.name, node_feat=X, adj=E)
-        eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
-        eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
+        eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value).unsqueeze(-1)
+        eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, value=concentration_value).unsqueeze(-1)
         eta_pair = (eta_x, eta_e)
 
         X = self.scale_shift(X, type='node')
@@ -242,20 +243,9 @@ class GraphBetaDiffusion(pl.LightningModule):
         extra_data = self.compute_extra_data(noisy_data)
 
         if self.pre_condition:
-            if self.cfg.model.noise_feat_type == 'deg':
-                mean_logit_X_t, std_logit_X_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node', prior_prob=self.pre_cond.prob_X)
-                noisy_data['X_t'] = (noisy_data['X_t'] - mean_logit_X_t) / std_logit_X_t
-            elif self.cfg.model.noise_feat_type == 'eig':
-                mean_logit_X_t, std_logit_X_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node')
-                noisy_data['X_t'] = (noisy_data['X_t'] - mean_logit_X_t) / std_logit_X_t
-            elif self.cfg.model.noise_feat_type == 'all':
-                mean_logit_X_deg_t, std_logit_X_deg_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node', prior_prob=self.pre_cond.prob_X)
-                mean_logit_X_eig_t, std_logit_X_eig_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node')
-                noisy_data['X_t'][..., :-2] = (noisy_data['X_t'][..., :-2] - mean_logit_X_deg_t) / std_logit_X_deg_t
-                noisy_data['X_t'][..., -2:] = (noisy_data['X_t'][..., -2:] - mean_logit_X_eig_t) / std_logit_X_eig_t
-            else:
-                pass
-
+            mean_logit_X_t, std_logit_X_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node', prior_prob=self.pre_cond.prob_X)
+            noisy_data['X_t'] = (noisy_data['X_t'] - mean_logit_X_t) / std_logit_X_t
+            
             mean_logit_E_t, std_logit_E_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'].unsqueeze(-1), eta_pair[1], type='edge', prior_prob=self.pre_cond.prob_E)
             noisy_data['E_t'] = (noisy_data['E_t'] - mean_logit_E_t) / std_logit_E_t
 
@@ -288,7 +278,7 @@ class GraphBetaDiffusion(pl.LightningModule):
         self.print("Size of the input features", self.Xdim, self.Edim, self.ydim)
         # Load graph list for test
         self.print('Load smiles or graph list...')
-        self.train_graph_list, self.test_graph_list = load_general_graph_list(self.cfg.dataset.name)
+        self.train_smiles, self.test_smiles, self.test_graph_list = load_molecule_list(self.cfg.dataset.name)
 
     def on_train_epoch_start(self) -> None:
         self.print("Starting train epoch...")
@@ -333,16 +323,17 @@ class GraphBetaDiffusion(pl.LightningModule):
                 to_generate = min(samples_left_to_generate, bs)
                 to_save = min(samples_left_to_save, bs)
 
-                sample_deg, sample_extra_feat, nodes_num = None, None, None
+                atom_dist, nodes_num = None, None
                 if self.cfg.model.eta_from == 'train':
-                    sample_deg, nodes_num = self.sample_from_train(to_generate, re_deg=True, re_feat=False)
+                    atom_dist, nodes_num = self.sample_from_train_mol(to_generate)
 
                 with self.ema_scope('Validation Sampling'):
                     graph = self.sample_batch(batch_id=ident, 
                                               batch_size=to_generate, 
                                               num_nodes=nodes_num,
                                               save_final=to_save, 
-                                              concentration_value=sample_deg,
+                                              concentration_value=None,
+                                              atom_dist=atom_dist,
                                               return_E=True)
                 E, n_nodes = graph
                 for (e, n_node) in zip(E, n_nodes):
@@ -392,7 +383,7 @@ class GraphBetaDiffusion(pl.LightningModule):
         if not hasattr(self, 'test_graph_list'):
             # Load graph list for test
             self.print('Load smiles or graph list...')
-            load_general_graph_list(self.cfg.dataset.name)
+            self.train_smiles, self.test_smiles, self.test_graph_list = load_molecule_list(self.cfg.dataset.name)
 
             # Load EMA
             if self.use_ema:
@@ -418,20 +409,22 @@ class GraphBetaDiffusion(pl.LightningModule):
         Xs, Es = [], []
         ident = 0
         while samples_left_to_generate > 0:
-            bs = 300  # 3096  # self.cfg.general.samples_to_generate // 5  # 2 * self.cfg.train.batch_size
+            bs = 10000   # self.cfg.general.samples_to_generate // 5  # 2 * self.cfg.train.batch_size
             to_generate = min(samples_left_to_generate, bs)
             to_save = min(samples_left_to_save, bs)
 
             sample_deg, sample_extra_feat, nodes_num = None, None, None
+            atom_dist, nodes_num = None, None
             if self.cfg.model.eta_from == 'train':
-                sample_deg, nodes_num = self.sample_from_train(to_generate, re_deg=True, re_feat=False)
+                atom_dist, nodes_num = self.sample_from_train_mol(to_generate)
 
             with self.ema_scope('Test Sampling'):
                 graph = self.sample_batch(batch_id=ident, 
                                             batch_size=to_generate, 
                                             num_nodes=nodes_num,
                                             save_final=to_save, 
-                                            concentration_value=sample_deg,
+                                            concentration_value=None,
+                                            atom_dist=atom_dist,
                                             return_E=True)
             E, n_nodes = graph
             for (e, n_node) in zip(E, n_nodes):
@@ -578,7 +571,7 @@ class GraphBetaDiffusion(pl.LightningModule):
     @torch.no_grad()
     def sample_batch(self, batch_id: int = 0, batch_size: int = 32,
                      save_final: int = 10, alpha_T=None,
-                     num_nodes=None, concentration_value=None, return_E=False, num_chain_step=None,
+                     num_nodes=None, concentration_value=None, atom_dist=None, return_E=False, num_chain_step=None,
                      keep_chain=None):
         """
         :param batch_id: int
@@ -596,7 +589,7 @@ class GraphBetaDiffusion(pl.LightningModule):
         else:
             assert isinstance(num_nodes, torch.Tensor)
             n_nodes = num_nodes
-        n_max = self.dataset_info.datamodule.test_dataset.max_node_num  # torch.max(n_nodes).item()
+        n_max = self.dataset_info.max_n_nodes  # torch.max(n_nodes).item()
         
         # Build the masks
         arange = torch.arange(n_max, device=self.device).unsqueeze(0).expand(batch_size, -1)
@@ -616,26 +609,30 @@ class GraphBetaDiffusion(pl.LightningModule):
         y = torch.zeros((batch_size, 0)).to(self.device)
 
         if self.noise_feat_type is None:
-            max_feat_num = 1
+            max_feat_num = self.dataset_info.num_atom_types
+            is_node_feat = False
         else:
-            max_feat_num = self.max_feat_num
+            max_feat_num = self.max_feat_num + self.dataset_info.num_atom_types
+            is_node_feat = True
 
         X_s = 0.01 * torch.ones(batch_size, N, max_feat_num, device=self.device)
-        E_s = 0.01 * torch.ones(batch_size, N, N, 1, device=self.device)
+        E_s = 0.01 * torch.ones(batch_size, N, N, self.dataset_info.num_edge_types - 1, device=self.device)
 
-        eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
-        eta_e = self.con_module.get_eta_e(X_s.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
-        eta_pair = (eta_x, eta_e)
+        eta_x = self.con_module.get_eta_x_sample(eta=self.eta['node'], value=X_s, eta_from=atom_dist)
+        eta_x = eta_x.unsqueeze(-1)  # [bs, N, 1]
+        eta_e = self.con_module.get_eta_e_sample(X_s.size(1), X_s.size(0), eta_e=self.eta['edge'], eta_from=atom_dist, eta_x=eta_x)  # [bs, N, N, 1]
+        eta_e = eta_e.unsqueeze(-1)
+        eta_pair = (eta_x, eta_e)  
 
         X_s = self.scale_shift(X_s, type='node')
         E_s = self.scale_shift(E_s, type='edge')
 
-        log_u_x = self.log_gamma((eta_x * alpha_T * X_s).to(torch.float32)).to(torch.float64)
-        log_v_x = self.log_gamma((eta_x - eta_x * alpha_T * X_s).to(torch.float32)).to(torch.float64)
+        log_u_x = self.log_gamma((eta_x * alpha_T * X_s).to(torch.float32))
+        log_v_x = self.log_gamma((eta_x - eta_x * alpha_T * X_s).to(torch.float32))
         logit_X_s = log_u_x - log_v_x
 
-        log_u_e = self.log_gamma((eta_e * alpha_T * E_s).to(torch.float32)).to(torch.float64)
-        log_v_e = self.log_gamma((eta_e - eta_e * alpha_T * E_s).to(torch.float32)).to(torch.float64)
+        log_u_e = self.log_gamma((eta_e * alpha_T * E_s).to(torch.float32))
+        log_v_e = self.log_gamma((eta_e - eta_e * alpha_T * E_s).to(torch.float32))
         logit_E_s = log_u_e - log_v_e
 
         if self.input_space == 'logit':
@@ -672,21 +669,10 @@ class GraphBetaDiffusion(pl.LightningModule):
                 extra_data = self.compute_extra_data(noisy_data)
 
                 if self.pre_condition:
-                    if self.cfg.model.noise_feat_type == 'deg':
-                        mean_logit_X_t, std_logit_X_t = self.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node', prior_prob=self.pre_cond.prob_X)
-                        noisy_data['X_t'] = (noisy_data['X_t'] - mean_logit_X_t) / std_logit_X_t
-                    elif self.cfg.model.noise_feat_type == 'eig':
-                        mean_logit_X_t, std_logit_X_t = self.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node')
-                        noisy_data['X_t'] = (noisy_data['X_t'] - mean_logit_X_t) / std_logit_X_t
-                    elif self.cfg.model.noise_feat_type == 'all':
-                        mean_logit_X_deg_t, std_logit_X_deg_t = self.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node', prior_prob=self.pre_cond.prob_X)
-                        mean_logit_X_eig_t, std_logit_X_eig_t = self.pre_condition_fn(noisy_data['alpha_t'], eta_pair[0], type='node')
-                        noisy_data['X_t'][..., :-2] = (noisy_data['X_t'][..., :-2] - mean_logit_X_deg_t) / std_logit_X_deg_t
-                        noisy_data['X_t'][..., -2:] = (noisy_data['X_t'][..., -2:] - mean_logit_X_eig_t) / std_logit_X_eig_t
-                    else:
-                        pass
+                    mean_logit_X_t, std_logit_X_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'], eta_x, type='node', prior_prob=self.pre_cond.prob_X)
+                    noisy_data['X_t'] = (noisy_data['X_t'] - mean_logit_X_t) / std_logit_X_t
 
-                    mean_logit_E_t, std_logit_E_t = self.pre_condition_fn(noisy_data['alpha_t'].unsqueeze(-1), eta_e, type='edge', prior_prob=self.pre_cond.prob_E)
+                    mean_logit_E_t, std_logit_E_t = self.pre_cond.pre_condition_fn(noisy_data['alpha_t'].unsqueeze(-1), eta_e, type='edge', prior_prob=self.pre_cond.prob_E)
                     noisy_data['E_t'] = (noisy_data['E_t'] - mean_logit_E_t) / std_logit_E_t
 
                     noisy_data['X_t'], noisy_data['E_t'] = self.mask_and_sym(noisy_data['X_t'], noisy_data['E_t'],
@@ -720,7 +706,7 @@ class GraphBetaDiffusion(pl.LightningModule):
         # X = self.shift_scale(torch.sigmoid(logit_X_s)/alpha_s)
         # E = self.shift_scale(torch.sigmoid(logit_E_s)/alpha_s)
 
-        beta_sample_s = diffusion_utils.sample_beta_features(X, E, node_mask, threshold=0.9, is_node_feat=True)
+        beta_sample_s = diffusion_utils.sample_beta_features_mol(X, E, node_mask, threshold=0.9, num_node_types=self.dataset_info.num_atom_types, is_node_feat=is_node_feat)
         out_one_hot = beta_sample_s.mask(node_mask, argmax=True, collapse=True)
         X, E, y = out_one_hot.X, out_one_hot.E, out_one_hot.y
 
@@ -815,164 +801,159 @@ class GraphBetaDiffusion(pl.LightningModule):
         extra_y = torch.cat((extra_y, t), dim=1)
 
         return utils.PlaceHolder(X=extra_X, E=extra_E, y=extra_y)
+        
+    def sample_from_train_mol(self, sample_num):
+        sample_idx = np.random.randint(0, len(self.train_smiles), sample_num)
+        sample_atom = self.atom_dist[sample_idx].to(torch.long).to(self.device)
 
-    def sample_from_train(self, sample_num, re_deg=False, re_feat=False, ):
-        sample_idx = np.random.randint(0, len(self.train_graph_list), sample_num)
-        sample_degree = self.degree_counts[sample_idx]
-        sample_degree, _ = torch.sort(sample_degree, dim=-1, descending=True)
-        feat = F.one_hot(sample_degree, num_classes=self.dataset_info.max_deg_num).to(torch.float32).to(self.device)
-        assert sample_num == feat.shape[0]
+        assert sample_num == sample_atom.shape[0]
 
-        num_nodes = feat[..., 1:].sum(dim=(-1, -2)).to(torch.long).to(self.device)
-        feat = feat[..., 1:]
-        if re_deg and re_feat:
-            return sample_degree, feat, num_nodes
-        elif re_deg and not re_feat:
-            return sample_degree, num_nodes
-        else:
-            return feat, num_nodes
+        num_nodes = sample_atom.sum(dim=-1).to(torch.long).to(self.device)
 
-    def visualization_graph_matrix(self, 
-                                X, 
-                                E, 
-                                node_mask, 
-                                given_t_split=50, 
-                                vis_graph=True, 
-                                vis_matrix=True, 
-                                vis_forward=True,
-                                order=False):
+        return sample_atom, num_nodes
 
-        diffusion_process = 'Forward' if vis_forward else 'Reverse'
-        if vis_forward:
-            file_name = 'forward_process'
-            node_idx = torch.argsort(E.sum((-1, -2)), dim=1, descending=True)
-            X, E, node_mask = order_graph(X, E, node_mask, node_idx)
+    # TODO NOT APPLY TO MOLECULE GRAPG GENERATION
+    # def visualization_graph_matrix(self, 
+    #                             X, 
+    #                             E, 
+    #                             node_mask, 
+    #                             given_t_split=50, 
+    #                             vis_graph=True, 
+    #                             vis_matrix=True, 
+    #                             vis_forward=True,
+    #                             order=False):
 
-            concentration_value = self.con_module.get_value(self.cfg.dataset.name, node_feat=X, adj=E)
-            eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
-            eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
-            eta_pair = (eta_x, eta_e)
+    #     diffusion_process = 'Forward' if vis_forward else 'Reverse'
+    #     if vis_forward:
+    #         file_name = 'forward_process'
+    #         node_idx = torch.argsort(E.sum((-1, -2)), dim=1, descending=True)
+    #         X, E, node_mask = order_graph(X, E, node_mask, node_idx)
 
-            # Follow the steps in Beta Diffusion.
-            # noisy_data in original/logit input_space
-            y = torch.zeros((X.size(0), 0)).to(self.device)
-            X = self.scale_shift(X)
-            E = self.scale_shift(E)
+    #         concentration_value = self.con_module.get_value(self.cfg.dataset.name, node_feat=X, adj=E)
+    #         eta_x = self.con_module.get_eta_x(self.eta['node'], value=concentration_value, threshold_list=self.threshold_list).unsqueeze(-1)
+    #         eta_e = self.con_module.get_eta_e(X.size(1), self.eta['edge'], eta_x, follow_x=True).unsqueeze(-1)
+    #         eta_pair = (eta_x, eta_e)
 
-            noisy_data = self.apply_noise(X, E, y, node_mask, given_t_split=given_t_split, etas=eta_x)
-            if self.input_space == 'logit':
-                noisy_data['X_t'] = noisy_data['X_t'].sigmoid()
-                noisy_data['E_t'] = noisy_data['E_t'].sigmoid()
+    #         # Follow the steps in Beta Diffusion.
+    #         # noisy_data in original/logit input_space
+    #         y = torch.zeros((X.size(0), 0)).to(self.device)
+    #         X = self.scale_shift(X)
+    #         E = self.scale_shift(E)
 
-            noisy_data['X_t'] = self.shift_scale(noisy_data['X_t'])
-            noisy_data['E_t'] = self.shift_scale(noisy_data['E_t'])
+    #         noisy_data = self.apply_noise(X, E, y, node_mask, given_t_split=given_t_split, etas=eta_x)
+    #         if self.input_space == 'logit':
+    #             noisy_data['X_t'] = noisy_data['X_t'].sigmoid()
+    #             noisy_data['E_t'] = noisy_data['E_t'].sigmoid()
 
-            con_X, con_E = self.mask_and_sym(noisy_data['X_t'], noisy_data['E_t'], noisy_data['node_mask'])
-            X, E = con_X.clone(), con_E.clone()
-            node_mask = noisy_data['node_mask']
-        else:
-            file_name = 'reverse_process'
-            if order:
-                tmp_beta_sample_s = diffusion_utils.sample_beta_features(X.clone(), E.clone(), node_mask, threshold=0.5,
-                                                                         is_node_feat=True)
-                tmp_X, tmp_E, tmp_y = tmp_beta_sample_s.X, tmp_beta_sample_s.E, tmp_beta_sample_s.y
-                tmp_E = tmp_E[..., 1:]
-                final_E = [tmp_E[(idx + 1) * given_t_split - 1] for idx in range(tmp_X.size(0) // given_t_split)]
+    #         noisy_data['X_t'] = self.shift_scale(noisy_data['X_t'])
+    #         noisy_data['E_t'] = self.shift_scale(noisy_data['E_t'])
 
-                node_idx = [torch.argsort(fE.sum((-1, -2)).view(1, -1), dim=1, descending=True) for fE in final_E]
-                node_idx = torch.concat([nm.repeat(given_t_split, 1) for nm in node_idx], dim=0)
+    #         con_X, con_E = self.mask_and_sym(noisy_data['X_t'], noisy_data['E_t'], noisy_data['node_mask'])
+    #         X, E = con_X.clone(), con_E.clone()
+    #         node_mask = noisy_data['node_mask']
+    #     else:
+    #         file_name = 'reverse_process'
+    #         if order:
+    #             tmp_beta_sample_s = diffusion_utils.sample_beta_features(X.clone(), E.clone(), node_mask, threshold=0.5,
+    #                                                                      is_node_feat=True)
+    #             tmp_X, tmp_E, tmp_y = tmp_beta_sample_s.X, tmp_beta_sample_s.E, tmp_beta_sample_s.y
+    #             tmp_E = tmp_E[..., 1:]
+    #             final_E = [tmp_E[(idx + 1) * given_t_split - 1] for idx in range(tmp_X.size(0) // given_t_split)]
 
-                X, E, node_mask = self.order_graph(X, E, node_mask.cpu(), node_idx)
+    #             node_idx = [torch.argsort(fE.sum((-1, -2)).view(1, -1), dim=1, descending=True) for fE in final_E]
+    #             node_idx = torch.concat([nm.repeat(given_t_split, 1) for nm in node_idx], dim=0)
 
-            con_X, con_E = self.mask_and_sym(X, E, node_mask)
+    #             X, E, node_mask = self.order_graph(X, E, node_mask.cpu(), node_idx)
 
-        # Get number of nodes in each graph
-        n_nodes = node_mask.sum(-1)
+    #         con_X, con_E = self.mask_and_sym(X, E, node_mask)
 
-        # Visualization
-        self.print('Visualization process with {} graphs for {} time steps...'.format(X.size(0), given_t_split))
+    #     # Get number of nodes in each graph
+    #     n_nodes = node_mask.sum(-1)
 
-        # Graph Visualization
-        if vis_graph:
-            beta_sample_s = diffusion_utils.sample_beta_features(X, E, node_mask, threshold=0.5, is_node_feat=True)
-            out_one_hot = beta_sample_s.mask(node_mask, argmax=True, collapse=True)
-            X, E, y = out_one_hot.X, out_one_hot.E, out_one_hot.y
+    #     # Visualization
+    #     self.print('Visualization process with {} graphs for {} time steps...'.format(X.size(0), given_t_split))
 
-            Es = []
-            for i in range(X.size(0)):
-                n = n_nodes[i]
-                Es.append(E[i, :n, :n].cpu())
-            gen_graph_list = adjs_to_graphs(Es, True)
+    #     # Graph Visualization
+    #     if vis_graph:
+    #         beta_sample_s = diffusion_utils.sample_beta_features(X, E, node_mask, threshold=0.5, is_node_feat=True)
+    #         out_one_hot = beta_sample_s.mask(node_mask, argmax=True, collapse=True)
+    #         X, E, y = out_one_hot.X, out_one_hot.E, out_one_hot.y
 
-            # save graph pkl
-            ckpt_dir = self.cfg.general.test_only.split('checkpoints')[0]
-            ckpt_name = self.cfg.general.test_only.split('/')[-1].split('=')[1].split('-')[0]
-            graph_ckpt_path = os.path.join(ckpt_dir, f'{diffusion_process}_Graph_Process_{ckpt_name}.pkl')
-            with open(graph_ckpt_path, 'wb') as f:
-                pickle.dump(obj=gen_graph_list, file=f, protocol=pickle.HIGHEST_PROTOCOL)
+    #         Es = []
+    #         for i in range(X.size(0)):
+    #             n = n_nodes[i]
+    #             Es.append(E[i, :n, :n].cpu())
+    #         gen_graph_list = adjs_to_graphs(Es, True)
+
+    #         # save graph pkl
+    #         ckpt_dir = self.cfg.general.test_only.split('checkpoints')[0]
+    #         ckpt_name = self.cfg.general.test_only.split('/')[-1].split('=')[1].split('-')[0]
+    #         graph_ckpt_path = os.path.join(ckpt_dir, f'{diffusion_process}_Graph_Process_{ckpt_name}.pkl')
+    #         with open(graph_ckpt_path, 'wb') as f:
+    #             pickle.dump(obj=gen_graph_list, file=f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-        # Matrix Visualization
-        if vis_matrix:
-            cmap_colors = [(1, 1, 1), (0, 0, 0)]
-            cmap = LinearSegmentedColormap.from_list('CustomCmap', cmap_colors)
-            graph_num = con_E.size(0) // given_t_split
-            for idx in range(graph_num):
-                num_rows = 2
-                num_cols = given_t_split // num_rows
-                fig, axes = plt.subplots(num_rows, num_cols, figsize=(num_cols * 2, num_rows * 2))
-                for state_id in range(given_t_split):
-                    adj = con_E[idx * given_t_split + state_id, ..., 0].numpy()
+    #     # Matrix Visualization
+    #     if vis_matrix:
+    #         cmap_colors = [(1, 1, 1), (0, 0, 0)]
+    #         cmap = LinearSegmentedColormap.from_list('CustomCmap', cmap_colors)
+    #         graph_num = con_E.size(0) // given_t_split
+    #         for idx in range(graph_num):
+    #             num_rows = 2
+    #             num_cols = given_t_split // num_rows
+    #             fig, axes = plt.subplots(num_rows, num_cols, figsize=(num_cols * 2, num_rows * 2))
+    #             for state_id in range(given_t_split):
+    #                 adj = con_E[idx * given_t_split + state_id, ..., 0].numpy()
 
-                    ax = axes[math.floor(state_id / num_cols), state_id % num_cols]
-                    ax.imshow(adj, cmap=cmap, interpolation='nearest', vmin=0, vmax=1)
-                    ax.set_xticks([])
-                    ax.set_yticks([])
+    #                 ax = axes[math.floor(state_id / num_cols), state_id % num_cols]
+    #                 ax.imshow(adj, cmap=cmap, interpolation='nearest', vmin=0, vmax=1)
+    #                 ax.set_xticks([])
+    #                 ax.set_yticks([])
 
-                current_path = os.getcwd()
+    #             current_path = os.getcwd()
 
-                result_path = os.path.join(current_path,
-                                           f'{file_name}/graph_{idx}/')
-                if not os.path.exists(result_path):
-                    os.makedirs(result_path)
+    #             result_path = os.path.join(current_path,
+    #                                        f'{file_name}/graph_{idx}/')
+    #             if not os.path.exists(result_path):
+    #                 os.makedirs(result_path)
 
-                plt.tight_layout()
-                plt.savefig(os.path.join(result_path, f'{diffusion_process}_Matrix_Process.png', ))
+    #             plt.tight_layout()
+    #             plt.savefig(os.path.join(result_path, f'{diffusion_process}_Matrix_Process.png', ))
 
 
-    def process_visualization(self, datamodule, given_t_split=20):
+    # def process_visualization(self, datamodule, given_t_split=20):
 
-        data = next(iter(datamodule.test_dataloader()))
+    #     data = next(iter(datamodule.test_dataloader()))
 
-        dense, node_mask = utils.to_dense(data.x, data.edge_index, data.edge_attr,
-                                          data.batch, max_num_nodes=datamodule.train_dataset.max_node_num)
-        dense_data = dense.mask(node_mask)
-        X, E = dense_data.X, dense_data.E[..., 1:]  # remove 'no edge' and 'Aromatic bond'
-        X, E = X[:self.cfg.general.vis_number], E[:self.cfg.general.vis_number]
-        node_mask = node_mask[:self.cfg.general.vis_number]
+    #     dense, node_mask = utils.to_dense(data.x, data.edge_index, data.edge_attr,
+    #                                       data.batch, max_num_nodes=datamodule.train_dataset.max_node_num)
+    #     dense_data = dense.mask(node_mask)
+    #     X, E = dense_data.X, dense_data.E[..., 1:]  # remove 'no edge' and 'Aromatic bond'
+    #     X, E = X[:self.cfg.general.vis_number], E[:self.cfg.general.vis_number]
+    #     node_mask = node_mask[:self.cfg.general.vis_number]
 
-        # X = utils.init_node_feats(X, E, feat_type=self.noise_feat_type, max_feat_num=self.max_feat_num)
+    #     # X = utils.init_node_feats(X, E, feat_type=self.noise_feat_type, max_feat_num=self.max_feat_num)
 
-        # TODO Visualization doesn't need scale_shift?
-        # X = self.scale_shift(X)
-        # E = self.scale_shift(E)
+    #     # TODO Visualization doesn't need scale_shift?
+    #     # X = self.scale_shift(X)
+    #     # E = self.scale_shift(E)
 
-        self.visualization_graph_matrix(X, E, node_mask, given_t_split, graph=True, matrix=True)
+    #     self.visualization_graph_matrix(X, E, node_mask, given_t_split, graph=True, matrix=True)
 
-    def sample_visualization(self, to_sample=5, given_t_split=20):
-        if self.cfg.model.eta_from == 'train':
-            sample_deg, nodes_num = self.sample_from_train(to_sample, re_deg=True, re_feat=False)
-        # else:
-        #     sample_extra_feat, nodes_num = None, None
-        chain_X, chain_E, node_mask = self.sample_batch(batch_size=to_sample, num_nodes=nodes_num, concentration_value=sample_deg,
-                                                        num_chain_step=given_t_split, keep_chain=to_sample)
+    # def sample_visualization(self, to_sample=5, given_t_split=20):
+    #     if self.cfg.model.eta_from == 'train':
+    #         sample_deg, nodes_num = self.sample_from_train(to_sample, re_deg=True, re_feat=False)
+    #     # else:
+    #     #     sample_extra_feat, nodes_num = None, None
+    #     chain_X, chain_E, node_mask = self.sample_batch(batch_size=to_sample, num_nodes=nodes_num, concentration_value=sample_deg,
+    #                                                     num_chain_step=given_t_split, keep_chain=to_sample)
 
-        # X = torch.stack(chain_X, dim=0)
-        X = torch.concat([chain_X[:, i, ...] for i in range(chain_X.size(1))], dim=0)
-        # E = torch.stack(chain_E, dim=0)
-        E = torch.concat([chain_E[:, i, ...] for i in range(chain_E.size(1))], dim=0)
+    #     # X = torch.stack(chain_X, dim=0)
+    #     X = torch.concat([chain_X[:, i, ...] for i in range(chain_X.size(1))], dim=0)
+    #     # E = torch.stack(chain_E, dim=0)
+    #     E = torch.concat([chain_E[:, i, ...] for i in range(chain_E.size(1))], dim=0)
 
-        node_mask = torch.concat([nm.repeat(given_t_split, 1) for nm in node_mask], dim=0)
+    #     node_mask = torch.concat([nm.repeat(given_t_split, 1) for nm in node_mask], dim=0)
 
-        self.visualization_graph_matrix(X, E, node_mask, given_t_split, graph=True, matrix=True, sample_vis=True,
-                                        order=True)
+    #     self.visualization_graph_matrix(X, E, node_mask, given_t_split, graph=True, matrix=True, sample_vis=True,
+    #                                     order=True)
