@@ -101,16 +101,16 @@ class PreConditionMoudle(object):
         alpha_t = alpha_t.contiguous().view(-1, 1)
         eta = eta.contiguous().view(-1, 1)
 
-        E1 = 1.0 / (eta * alpha_t * xmin) * (
+        E1 = 1.0 / (eta * alpha_t * (xmax - xmin)) * (
                 (eta * alpha_t * xmax).lgamma() - (eta * alpha_t * xmin).lgamma())
-        E2 = 1.0 / (eta * alpha_t * xmin) * (
+        E2 = 1.0 / (eta * alpha_t * (xmax - xmin)) * (
                 (eta - eta * alpha_t * xmin).lgamma() - (eta - eta * alpha_t * xmax).lgamma())
 
         E_logit_x_t = E1 - E2
 
-        V1 = 1.0 / (eta * alpha_t * xmin) * (
+        V1 = 1.0 / (eta * alpha_t * (xmax - xmin)) * (
                 (eta * alpha_t * xmax).digamma() - (eta * alpha_t * xmin).digamma())
-        V2 = 1.0 / (eta * alpha_t * xmin) * (
+        V2 = 1.0 / (eta * alpha_t * (xmax - xmin)) * (
                 (eta - eta * alpha_t * xmin).digamma() - (eta - eta * alpha_t * xmax).digamma())
 
         grids = self.scale_shift(torch.arange(0, 101, device=self.device) / 100, type='node')
@@ -137,6 +137,7 @@ class PreConditionMoudle(object):
         bounds = torch.tensor([self.Shift[type], self.Scale[type] + self.Shift[type]])
 
         if prior_prob is None:
+            # continuous version of pre-conditioning
             mean_t, std_t = self.get_logit_beta_stats_con(bounds=bounds, eta=eta, alpha_t=alpha_t)
             return mean_t, std_t
         
